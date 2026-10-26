@@ -1,0 +1,19 @@
+Pedido;Data Pedido;Fornecedor;CNPJ Filial;Nome Filial
+88421;12/03/2026;Distribuidora Alfa Ltda;10.846.217/0003-32;Original Jaguaruana
+Código Reduzido;EAN Principal;Descrição;Quantidade;Laboratório
+5010;="7891000056523";Dipirona 500 mg — 20 comprimidos;4;Medley
+5011;7891000056530;Soro fisiológico 0,9% — 250 ml;6;Farmax
+5010;="7891000056523";Dipirona 500 mg — 20 comprimidos;1;Medley
+
+Pedido;Data Pedido;Fornecedor;CNPJ Filial;Nome Filial
+88422;12/03/2026;Distribuidora Beta S.A.;10.846.217/0005-02;Original Filial Russas
+Código Reduzido;EAN Principal;Descrição;Quantidade;Laboratório
+5010;="7891000056523";Dipirona 500 mg — 20 comprimidos;7;Medley
+5010;="7891000056523";Dipirona 500 mg — 20 comprimidos;2;Medley
+5012;7891000056547;Álcool 70% — 500 ml;3;Rioquímica
+
+Pedido;Data Pedido;Fornecedor;CNPJ Filial;Nome Filial
+88423;13/03/2026;Distribuidora Alfa Ltda;10.846.217/0002-51;Atacadão Tabuleiro
+Código Reduzido;EAN Principal;Descrição;Quantidade;Laboratório
+5010;="7891000056523";Dipirona 500 mg — 20 comprimidos;9;Medley
+5012;7891000056547;Álcool 70% — 500 ml;5;Rioquímica

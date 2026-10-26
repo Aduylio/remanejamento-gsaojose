@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  color-scheme: light;
+}
+
+@layer base {
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  a,
+  summary {
+    outline-offset: 2px;
+  }
+
+  a:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid #dc2626;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: #fecaca;
+    color: #7f1d1d;
+  }
+}
