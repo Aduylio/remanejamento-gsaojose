@@ -10,14 +10,12 @@ function mapearFilial(filial: {
   numero: number;
   nome: string;
   cnpj: string;
-  precisaTrocarSenha?: boolean;
 }): Loja {
   return {
     id: filial.id as LojaId,
     numero: filial.numero,
     nome: filial.nome,
     cnpj: filial.cnpj,
-    precisaTrocarSenha: filial.precisaTrocarSenha ?? false,
   };
 }
 
@@ -30,7 +28,6 @@ export const listarFiliais = cache(async (): Promise<Loja[]> => {
       numero: true,
       nome: true,
       cnpj: true,
-      precisaTrocarSenha: true,
     },
   });
 
@@ -50,7 +47,6 @@ export const buscarFilialPorId = cache(
         numero: true,
         nome: true,
         cnpj: true,
-        precisaTrocarSenha: true,
       },
     });
 

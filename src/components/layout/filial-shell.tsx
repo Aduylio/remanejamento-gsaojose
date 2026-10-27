@@ -2,7 +2,6 @@
 
 import {
   ClipboardList,
-  KeyRound,
   LayoutDashboard,
   PackageCheck,
   Store,
@@ -31,11 +30,6 @@ const navegacao: NavItem[] = [
     href: "/painel/separacao",
     label: "Separação",
     icon: PackageCheck,
-  },
-  {
-    href: "/conta/trocar-senha",
-    label: "Alterar senha",
-    icon: KeyRound,
   },
 ];
 

@@ -3,7 +3,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PapelUsuario, PrismaClient } from "@prisma/client";
 
-import { gerarSenhaInicial } from "../src/lib/auth/senha-inicial";
+import { gerarSenhaFixaPorLojaId } from "../src/lib/auth/senha-inicial";
 import { precisaConfigurarSenha } from "../src/lib/auth/permissoes";
 import { LOJAS } from "../src/data/lojas";
 
@@ -63,14 +63,10 @@ async function seedSenhasFiliais(): Promise<void> {
   });
 
   let criadas = 0;
-  let ignoradas = 0;
+  let atualizadas = 0;
   let pendentes = 0;
 
   for (const filial of filiais) {
-    if (!precisaConfigurarSenha(filial.senhaHash)) {
-      ignoradas += 1;
-      continue;
-    }
     if (!filial.cnpj || filial.cnpj.replace(/\D/g, "").length !== 14) {
       pendentes += 1;
       console.warn(
@@ -78,22 +74,37 @@ async function seedSenhasFiliais(): Promise<void> {
       );
       continue;
     }
-    const senhaInicial = gerarSenhaInicial(filial.nome, filial.cnpj);
+
+    const senhaFixa = gerarSenhaFixaPorLojaId(filial.id);
     const salt = bcrypt.genSaltSync(10);
-    const hash = bcrypt.hashSync(senhaInicial, salt);
+    const hash = bcrypt.hashSync(senhaFixa, salt);
+
+    if (precisaConfigurarSenha(filial.senhaHash)) {
+      await prisma.filial.update({
+        where: { id: filial.id },
+        data: {
+          senhaHash: hash,
+          precisaTrocarSenha: false,
+        },
+      });
+      criadas += 1;
+      continue;
+    }
+
+    // Atualiza para senha fixa quando já existir hash, mantendo idempotência
     await prisma.filial.update({
       where: { id: filial.id },
       data: {
         senhaHash: hash,
-        precisaTrocarSenha: true,
+        precisaTrocarSenha: false,
       },
     });
-    criadas += 1;
+    atualizadas += 1;
     // Não logar senhas
   }
 
   console.info(
-    `Senhas filiais: ${criadas} configurada(s) com hash bcrypt, ${ignoradas} já existente(s) preservada(s), ${pendentes} com pendência (CNPJ).`,
+    `Senhas filiais: ${criadas} configurada(s) com senha fixa SAOJOSExx, ${atualizadas} atualizada(s) para senha fixa, ${pendentes} com pendência (CNPJ).`,
   );
 }
 

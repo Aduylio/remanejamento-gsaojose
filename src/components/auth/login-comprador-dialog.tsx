@@ -1,7 +1,8 @@
 "use client";
 
 import { AlertCircle, Eye, EyeOff, LogIn } from "lucide-react";
-import { useActionState, useId, useState } from "react";
+import { useActionState, useEffect, useId, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { entrarComoComprador } from "@/app/login/actions";
 import { Alert } from "@/components/ui/alert";
@@ -21,7 +22,7 @@ export function LoginCompradorDialog({
   return (
     <>
       <Button
-        className="w-full"
+        className="w-full h-11 rounded-[9px] border border-[var(--color-border-strong)] bg-white text-[var(--color-navy-900)] hover:bg-[var(--color-blue-50)]"
         variant={variant}
         onClick={() => setAberto(true)}
       >
@@ -35,7 +36,9 @@ export function LoginCompradorDialog({
         title="Login comprador"
         description="Acesse o painel para cadastrar remanejamentos e acompanhar as separações."
       >
-        {aberto ? <FormularioLoginComprador onCancelar={() => setAberto(false)} /> : null}
+        {aberto ? (
+          <FormularioLoginComprador onCancelar={() => setAberto(false)} />
+        ) : null}
       </Dialog>
     </>
   );
@@ -46,9 +49,18 @@ function FormularioLoginComprador({
 }: {
   onCancelar: () => void;
 }) {
+  const router = useRouter();
   const idSenha = useId();
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [estado, formAction] = useActionState(entrarComoComprador, {});
+
+  useEffect(() => {
+    if (estado?.sucesso && estado.destino) {
+      onCancelar();
+      router.push(estado.destino);
+      router.refresh();
+    }
+  }, [estado, onCancelar, router]);
 
   return (
     <form action={formAction} className="space-y-4">

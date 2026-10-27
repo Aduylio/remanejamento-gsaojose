@@ -2,9 +2,7 @@
 
 import {
   ClipboardList,
-  FileSpreadsheet,
   LayoutDashboard,
-  ScrollText,
   ShoppingBag,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -26,17 +24,6 @@ const navegacao: NavItem[] = [
     label: "Remanejamentos",
     icon: ClipboardList,
   },
-  {
-    href: "/comprador/importar",
-    label: "Importar pedido",
-    icon: FileSpreadsheet,
-    exact: true,
-  },
-  {
-    href: "/comprador/auditoria",
-    label: "Auditoria",
-    icon: ScrollText,
-  },
 ];
 
 export function CompradorShell({
@@ -53,8 +40,8 @@ export function CompradorShell({
       <RemanejamentosProvider remanejamentosIniciais={remanejamentosIniciais}>
         <AppShell
           mode="comprador"
-          contextTitle="Comprador"
-          contextSubtitle="Visão de toda a rede"
+          contextTitle="Grupo São José"
+          contextSubtitle="Painel do comprador"
           contextIcon={ShoppingBag}
           navItems={navegacao}
         >

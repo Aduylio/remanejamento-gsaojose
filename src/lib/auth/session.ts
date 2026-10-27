@@ -39,7 +39,6 @@ interface PayloadFilial {
   filialId: string;
   criadoEm: number;
   expiraEm: number;
-  credencialVersao: number;
 }
 
 function assinar(payload: string): string {
@@ -100,22 +99,13 @@ function validarTokenComprador(token: string): boolean {
   }
 }
 
-async function versaoCredencialDaLoja(lojaId: string): Promise<number> {
-  const filial = await prisma.filial.findUnique({
-    where: { id: lojaId },
-    select: { senhaAlteradaEm: true },
-  });
-  return filial?.senhaAlteradaEm?.getTime() ?? 0;
-}
-
-async function criarTokenFilial(lojaId: string): Promise<string> {
+function criarTokenFilial(lojaId: string): string {
   const agora = Date.now();
   const payload: PayloadFilial = {
     papel: "filial",
     filialId: lojaId,
     criadoEm: agora,
     expiraEm: agora + DURACAO_SESSAO_SEGUNDOS * 1000,
-    credencialVersao: await versaoCredencialDaLoja(lojaId),
   };
   const codificado = Buffer.from(JSON.stringify(payload)).toString(
     "base64url",
@@ -124,7 +114,7 @@ async function criarTokenFilial(lojaId: string): Promise<string> {
   return `${codificado}.${assinar(codificado)}`;
 }
 
-async function validarTokenFilial(token: string): Promise<string | null> {
+function validarTokenFilial(token: string): string | null {
   const [codificado, assinatura] = token.split(".");
 
   if (!codificado || !assinatura) {
@@ -149,11 +139,6 @@ async function validarTokenFilial(token: string): Promise<string | null> {
       return null;
     }
 
-    const versaoAtual = await versaoCredencialDaLoja(payload.filialId);
-    if (payload.credencialVersao !== versaoAtual) {
-      return null;
-    }
-
     return payload.filialId;
   } catch {
     return null;
@@ -168,7 +153,7 @@ export async function obterFilialSelecionada(): Promise<Loja | undefined> {
     return undefined;
   }
 
-  const filialId = await validarTokenFilial(token);
+  const filialId = validarTokenFilial(token);
   return buscarFilialPorId(filialId);
 }
 
@@ -182,7 +167,7 @@ export async function sessaoCompradorAtiva(): Promise<boolean> {
 export async function iniciarSessaoDaLoja(lojaId: string): Promise<void> {
   const cookieStore = await cookies();
 
-  cookieStore.set(COOKIE_FILIAL, await criarTokenFilial(lojaId), {
+  cookieStore.set(COOKIE_FILIAL, criarTokenFilial(lojaId), {
     httpOnly: true,
     sameSite: "lax",
     secure: COOKIE_SEGURO,

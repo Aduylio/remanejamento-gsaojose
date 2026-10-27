@@ -1,0 +1,29 @@
+warning: in the working copy of 'src/app/globals.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/ui/button.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/ui/page-header.tsx', LF will be replaced by CRLF the next time Git touches it
+ prisma/seed.ts                                     |  33 [32m++[m[31m--[m
+ .../auditoria/_components/auditoria-tabela.tsx     | 172 [31m---------------------[m
+ src/app/comprador/auditoria/page.tsx               |  61 [31m--------[m
+ src/app/conta/trocar-senha/actions.ts              | 101 [31m------------[m
+ src/app/conta/trocar-senha/formulario.tsx          |  75 [31m---------[m
+ src/app/conta/trocar-senha/page.tsx                |  29 [31m----[m
+ src/app/globals.css                                |  95 [32m+++++++++++[m[31m-[m
+ src/app/layout.tsx                                 |  11 [32m+[m[31m-[m
+ src/app/login/actions.ts                           |  18 [32m++[m[31m-[m
+ src/app/login/page.tsx                             | 160 [32m+++++++++++++++[m[31m----[m
+ src/app/painel/layout.tsx                          |   4 [31m-[m
+ src/components/auth/login-comprador-dialog.tsx     |  18 [32m++[m[31m-[m
+ src/components/auth/login-filial-dialog.tsx        |  30 [32m+++[m[31m-[m
+ src/components/importacao/importar-pedido.tsx      |  37 [32m+[m[31m----[m
+ src/components/importacao/importar-trier.tsx       |   2 [32m+[m[31m-[m
+ src/components/layout/app-shell.tsx                |  97 [32m++++++++[m[31m----[m
+ src/components/layout/comprador-shell.tsx          |  17 [32m+[m[31m-[m
+ src/components/layout/filial-shell.tsx             |   6 [31m-[m
+ .../remanejamentos/novo-remanejamento-form.tsx     |   5 [32m+[m[31m-[m
+ src/components/ui/button.tsx                       |  17 [32m+[m[31m-[m
+ src/components/ui/page-header.tsx                  |  35 [32m++++[m[31m-[m
+ src/lib/auth/senha-inicial.ts                      |  13 [32m++[m
+ src/lib/auth/session.ts                            |  23 [32m+[m[31m--[m
+ src/lib/db/filiais.ts                              |   4 [31m-[m
+ src/lib/types.ts                                   |   2 [32m+[m[31m-[m
+ 25 files changed, 431 insertions(+), 634 deletions(-)

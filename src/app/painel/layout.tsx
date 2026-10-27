@@ -28,10 +28,6 @@ export default async function PainelLayout({
     redirect("/login?erro=filial");
   }
 
-  if (loja.precisaTrocarSenha) {
-    redirect("/conta/trocar-senha");
-  }
-
   return (
     <FilialShell
       loja={loja}

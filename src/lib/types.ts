@@ -17,7 +17,7 @@ export interface Loja {
   nome: string;
   /** CNPJ normalizado, somente dígitos. */
   cnpj: string;
-  /** Indica que a senha ainda é a credencial inicial provisória. */
+  /** Mantido por compatibilidade; não utilizado pelo fluxo atual. */
   precisaTrocarSenha?: boolean;
 }
 

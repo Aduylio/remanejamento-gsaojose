@@ -79,9 +79,9 @@ export function ImportarTrier() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <PageHeader
-        eyebrow="Comprador"
         title="Remanejamento do Trier"
         description="Importe o arquivo de transferência exportado pelo Trier."
+        align="center"
         actions={
           <Link href="/comprador/remanejamentos/novo/modalidade" className={buttonVariants({ variant: "secondary", size: "sm" })}>
             Voltar

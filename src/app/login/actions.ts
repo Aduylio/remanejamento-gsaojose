@@ -23,12 +23,16 @@ import { prisma } from "@/lib/prisma";
 
 export interface EstadoLoginComprador {
   erro?: string;
+  sucesso?: boolean;
+  destino?: string;
 }
 
 export interface EstadoLoginFilial {
   erro?: string;
   bloqueado?: boolean;
   bloqueadoAte?: string;
+  sucesso?: boolean;
+  destino?: string;
 }
 
 const ERRO_BLOQUEIO =
@@ -198,7 +202,10 @@ export async function acessarFilial(
   });
 
   await iniciarSessaoDaLoja(filial.id);
-  redirect("/painel");
+  return { sucesso: true, destino: "/painel" } as EstadoLoginFilial & {
+    sucesso?: boolean;
+    destino?: string;
+  };
 }
 
 export async function entrarComoComprador(
@@ -234,10 +241,13 @@ export async function entrarComoComprador(
   });
 
   await iniciarSessaoDoComprador();
-  redirect("/comprador");
+  return { sucesso: true, destino: "/comprador" } as EstadoLoginComprador & {
+    sucesso?: boolean;
+    destino?: string;
+  };
 }
 
-export async function sair(): Promise<void> {
+export async function sair(): Promise<{ sucesso: boolean }> {
   const cabecalhos = await headers();
   try {
     const [filial, comprador] = await Promise.all([
@@ -259,5 +269,5 @@ export async function sair(): Promise<void> {
     });
   } catch {}
   await encerrarSessoes();
-  redirect("/login");
+  return { sucesso: true };
 }

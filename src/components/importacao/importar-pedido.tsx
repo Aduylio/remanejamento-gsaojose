@@ -486,9 +486,8 @@ export function ImportarPedido() {
   return (
     <div className="mx-auto w-full max-w-6xl">
       <PageHeader
-        eyebrow="Comprador"
         title="Importar pedido agrupado"
-        description="Envie o pedido agrupado em .csv ou .xlsx. O vínculo com cada destino é feito pelo CNPJ da filial, com prévia antes de qualquer gravação."
+        align="center"
         actions={
           <Link
             href="/comprador"
@@ -500,14 +499,6 @@ export function ImportarPedido() {
       />
 
       <div className="space-y-6">
-        <Alert variant="info">
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <p>
-            <strong className="font-semibold">Importação persistente.</strong>{" "}
-            A importação é validada e confirmada no servidor. Os
-            remanejamentos só são gravados no banco após a confirmação.
-          </p>
-        </Alert>
 
         {erroLocal ? (
           <Alert variant="danger">
@@ -678,32 +669,6 @@ export function ImportarPedido() {
             </div>
           </Alert>
         ) : null}
-
-        <section className="border-t border-slate-200 pt-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <Store className="size-4 text-slate-500" aria-hidden="true" />
-            Como o arquivo é interpretado
-          </h2>
-          <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
-            <li>
-              Blocos de pedido são lidos em sequência, com linhas em branco
-              permitidas entre eles.
-            </li>
-            <li>
-              O CNPJ da filial é normalizado para 14 dígitos e comparado ao
-              cadastro oficial. Nome da filial e número da loja não são usados
-              para o vínculo.
-            </li>
-            <li>
-              EANs em fórmula, como <code>=&quot;7891000056523&quot;</code>, são
-              lidos como texto e mantêm zeros à esquerda.
-            </li>
-            <li>
-              Produtos repetidos no mesmo pedido são preservados linha a linha e
-              sinalizados na prévia.
-            </li>
-          </ul>
-        </section>
       </div>
     </div>
   );

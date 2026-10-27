@@ -1,13 +1,12 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { LogOut, Menu } from "lucide-react";
+import { LogOut, Menu, Store } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useTransition, type ReactNode } from "react";
 
 import { sair } from "@/app/login/actions";
-import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -52,6 +51,19 @@ function Navegacao({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const handleSair = () => {
+    startTransition(async () => {
+      try {
+        await sair();
+      } finally {
+        router.push("/login");
+        router.refresh();
+      }
+    });
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -71,7 +83,7 @@ function Navegacao({
       </div>
 
       <nav aria-label="Navegação principal" className="flex-1 px-3 py-4">
-        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
           Menu
         </p>
         <ul className="space-y-1">
@@ -86,20 +98,20 @@ function Navegacao({
                   onClick={onNavigate}
                   aria-current={ativo ? "page" : undefined}
                   className={cn(
-                    "flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    "flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-150",
                     ativo
-                      ? "bg-red-50 text-red-700"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                      ? "bg-white/10 text-white shadow-[inset_2px_0_0_0_var(--color-red-600)]"
+                      : "text-white/70 hover:bg-white/5 hover:text-white",
                   )}
                 >
                   <Icon
                     className={cn(
-                      "size-4 shrink-0",
-                      ativo ? "text-red-700" : "text-slate-400",
+                      "size-[18px] shrink-0",
+                      ativo ? "text-white" : "text-white/60",
                     )}
                     aria-hidden="true"
                   />
-                  <span>{item.label}</span>
+                  <span className="font-medium">{item.label}</span>
                 </Link>
               </li>
             );
@@ -107,18 +119,18 @@ function Navegacao({
         </ul>
       </nav>
 
-      <div className="border-t border-slate-200 p-3">
-        <form action={sair}>
-          <Button
-            type="submit"
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-          >
-            <LogOut className="size-4" aria-hidden="true" />
-            {mode === "filial" ? "Sair / trocar filial" : "Sair"}
-          </Button>
-        </form>
+      <div className="border-t border-white/10 p-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-white/80 hover:bg-white/5 hover:text-white"
+          disabled={isPending}
+          onClick={handleSair}
+        >
+          <LogOut className="size-4" aria-hidden="true" />
+          {mode === "filial" ? "Sair / trocar filial" : "Sair"}
+        </Button>
       </div>
     </div>
   );
@@ -135,10 +147,31 @@ export function AppShell({
   const [menuAberto, setMenuAberto] = useState(false);
 
   return (
-    <div className="flex min-h-dvh bg-slate-50">
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
-        <div className="flex h-16 items-center border-b border-slate-200 px-5">
-          <BrandMark />
+    <div className="flex min-h-dvh bg-[var(--color-bg)]">
+      <aside className="sticky top-0 hidden h-dvh w-[var(--sidebar-width)] shrink-0 flex-col bg-gradient-to-b from-[var(--color-navy-900)] to-[var(--color-navy-800)] lg:flex">
+        <div className="flex h-[var(--header-height)] items-center border-b border-white/10 px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+              <Store className="h-4 w-4 text-white" />
+            </div>
+            <div className="leading-tight">
+              <p className="text-sm font-semibold text-white">
+                Grupo São José
+              </p>
+              <p className="text-xs text-white/60">Remanejamento</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-6 py-4">
+          <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+            <p className="text-xs uppercase tracking-[0.3em] text-white/40">
+              {mode === "filial" ? "Filial selecionada" : "Painel"}
+            </p>
+            <p className="mt-1 truncate text-sm font-medium text-white">
+              {contextTitle}
+            </p>
+            <p className="truncate text-xs text-white/60">{contextSubtitle}</p>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <Navegacao
@@ -161,7 +194,14 @@ export function AppShell({
           >
             <Menu className="size-5" />
           </Button>
-          <BrandMark compact />
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-blue-50)]">
+              <Store className="h-4 w-4 text-[var(--color-navy-900)]" />
+            </div>
+            <span className="text-sm font-semibold text-[var(--color-navy-900)]">
+              Grupo São José
+            </span>
+          </div>
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             {mode === "filial" ? "Filial" : "Comprador"}
           </span>
@@ -180,6 +220,7 @@ export function AppShell({
         open={menuAberto}
         onOpenChange={setMenuAberto}
         title="Menu"
+        className="bg-gradient-to-b from-[var(--color-navy-900)] to-[var(--color-navy-800)] text-white"
       >
         <Navegacao
           navItems={navItems}

@@ -268,9 +268,7 @@ export function NovoRemanejamentoForm() {
   return (
     <>
       <PageHeader
-        eyebrow="Novo remanejamento"
-        title="Transferir mercadorias entre lojas"
-        description="Defina a filial de origem, os destinos e distribua as quantidades de cada produto. A origem separa os itens antes da entrega."
+        title="Digitar manualmente"
         actions={
           <Link
             href="/comprador/remanejamentos/novo/modalidade"
@@ -635,7 +633,6 @@ export function NovoRemanejamentoForm() {
           <Alert variant="warning">
             <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
-              Ao criar, a filial de origem verá a tarefa na fila de separação.
               O número é reservado de forma atômica no banco.
             </span>
           </Alert>

@@ -28,3 +28,16 @@ export function gerarSenhaInicial(nome: string, cnpj: string): string {
   const prefixo = nomeNormalizado.slice(0, 8) || "filial";
   return `${prefixo}${sufixo}`;
 }
+
+export function gerarSenhaFixaPorLojaId(lojaId: string): string {
+  const match = lojaId.match(/(\d+)$/);
+  if (!match) {
+    throw new Error(`Loja inválida para geração de senha fixa: ${lojaId}`);
+  }
+  const numero = Number(match[1]);
+  if (numero === 11) {
+    return "SAOJOSE11";
+  }
+  const sufixo = String(numero).padStart(2, "0");
+  return `SAOJOSE${sufixo}`;
+}

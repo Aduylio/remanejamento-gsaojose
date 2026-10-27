@@ -1,18 +1,84 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
+
+  --color-navy-900: #082b66;
+  --color-navy-800: #123f82;
+  --color-navy-700: #24569a;
+  --color-red-600: #e30620;
+  --color-red-700: #bf001b;
+  --color-blue-50: #eaf2fc;
+  --color-red-50: #fff0f2;
+
+  --color-bg: #f4f7fb;
+  --color-bg-alt: #f8fafd;
+  --color-surface: #ffffff;
+  --color-text-primary: #12233f;
+  --color-text-secondary: #5b6f8e;
+  --color-text-tertiary: #8796ac;
+  --color-border: #dfe6f0;
+  --color-border-strong: #c8d5e8;
+  --color-divider: #e8edf5;
+
+  --color-success: #0d9b6c;
+  --color-success-bg: #e8f8f0;
+  --color-warning: #d97706;
+  --color-warning-bg: #fff6e5;
+  --color-info: #1687d9;
+  --color-info-bg: #eaf5ff;
+  --color-danger: #dc2626;
+  --color-danger-bg: #fef0f0;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+
+  --shadow-sm: 0 1px 2px 0 rgb(8 43 102 / 0.02);
+  --shadow-md: 0 10px 40px -20px rgb(8 43 102 / 0.4);
+  --shadow-lg: 0 30px 60px -40px rgb(8 43 102 / 0.6);
+
+  --sidebar-width: 264px;
+  --header-height: 72px;
 }
 
 :root {
   color-scheme: light;
+  --font-inter: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 @layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
-    background-color: #f8fafc;
-    color: #0f172a;
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--color-navy-900);
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   a,
@@ -21,13 +87,28 @@
   }
 
   a:focus-visible,
-  summary:focus-visible {
-    outline: 2px solid #dc2626;
+  summary:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+    outline: 2px solid var(--color-red-600);
     outline-offset: 2px;
   }
 
   ::selection {
-    background-color: #fecaca;
-    color: #7f1d1d;
+    background-color: var(--color-red-50);
+    color: var(--color-navy-900);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
