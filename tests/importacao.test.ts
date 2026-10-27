@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { LOJAS } from "@/data/lojas";
 import { analisarCsv, analisarLinhas } from "@/lib/importacao/analisador";
 import { confirmarImportacao } from "@/lib/importacao/confirmacao";
 import { gerarRemanejamentosDaImportacao } from "@/lib/importacao/gerador";
@@ -31,6 +32,7 @@ function opcoes(
     importacaoId,
     referencia: "IMP-20260313-TEST",
     criadoEm: "2026-03-13T12:00:00.000Z",
+    filiais: LOJAS,
   };
 }
 
@@ -55,7 +57,7 @@ function analisarFixture(lojaOrigemId: LojaId = "loja-03") {
   return analisarCsv(CONTEUDO_FIXTURE, opcoes(lojaOrigemId));
 }
 
-function confirmar(
+async function confirmar(
   preview: PreviewImportacao,
   repositorio: ReturnType<typeof criarRepositorioRemanejamentosEmMemoria>,
   estado: { confirmada: boolean },
@@ -67,6 +69,7 @@ function confirmar(
     marcarConfirmada: () => {
       estado.confirmada = true;
     },
+    filiais: LOJAS,
   });
 }
 
@@ -280,7 +283,7 @@ describe("estruturas incompletas e quantidades inválidas", () => {
     expect(preview.podeConfirmar).toBe(false);
   });
 
-  it("bloqueia uma importação que só possui itens da própria origem", () => {
+  it("bloqueia uma importação que só possui itens da própria origem", async () => {
     const conteudo = csv(
       bloco("908", "10.846.217/0003-32", [
         ["1", "7891000056523", "Produto da origem", "4", "Lab"],
@@ -295,7 +298,9 @@ describe("estruturas incompletas e quantidades inválidas", () => {
     expect(preview.podeConfirmar).toBe(false);
 
     const repositorio = criarRepositorioRemanejamentosEmMemoria();
-    const resultado = confirmar(preview, repositorio, { confirmada: false });
+    const resultado = await confirmar(preview, repositorio, {
+      confirmada: false,
+    });
 
     expect(resultado.status).toBe("invalida");
     expect(repositorio.listar()).toHaveLength(0);
@@ -311,11 +316,11 @@ describe("confirmação, idempotência e persistência", () => {
     expect(repositorio.listar()).toHaveLength(0);
   });
 
-  it("confirma criando um remanejamento por destino com os metadados do pedido", () => {
+  it("confirma criando um remanejamento por destino com os metadados do pedido", async () => {
     const repositorio = criarRepositorioRemanejamentosEmMemoria();
     const estado = { confirmada: false };
     const { preview } = analisarFixture("loja-03");
-    const resultado = confirmar(preview, repositorio, estado);
+    const resultado = await confirmar(preview, repositorio, estado);
 
     expect(resultado.status).toBe("confirmada");
     expect(estado.confirmada).toBe(true);
@@ -343,20 +348,20 @@ describe("confirmação, idempotência e persistência", () => {
     ).toBe(true);
   });
 
-  it("impede confirmação duplicada e não cria registros extras", () => {
+  it("impede confirmação duplicada e não cria registros extras", async () => {
     const repositorio = criarRepositorioRemanejamentosEmMemoria();
     const estado = { confirmada: false };
     const { preview } = analisarFixture("loja-03");
 
-    const primeira = confirmar(preview, repositorio, estado);
-    const segunda = confirmar(preview, repositorio, estado);
+    const primeira = await confirmar(preview, repositorio, estado);
+    const segunda = await confirmar(preview, repositorio, estado);
 
     expect(primeira.status).toBe("confirmada");
     expect(segunda.status).toBe("duplicada");
     expect(repositorio.listar()).toHaveLength(2);
   });
 
-  it("revalida no servidor e rejeita prévia adulterada sem gravar", () => {
+  it("revalida no servidor e rejeita prévia adulterada sem gravar", async () => {
     const repositorio = criarRepositorioRemanejamentosEmMemoria();
     const estado = { confirmada: false };
     const { preview } = analisarFixture("loja-03");
@@ -372,27 +377,27 @@ describe("confirmação, idempotência e persistência", () => {
       ),
     };
 
-    const resultado = confirmar(adulterada, repositorio, estado);
+    const resultado = await confirmar(adulterada, repositorio, estado);
 
     expect(resultado.status).toBe("invalida");
     expect(estado.confirmada).toBe(false);
     expect(repositorio.listar()).toHaveLength(0);
   });
 
-  it("não cria registros parciais quando a persistência falha", () => {
+  it("não cria registros parciais quando a persistência falha", async () => {
     const repositorio = criarRepositorioRemanejamentosEmMemoria({
       falharAoGravar: true,
     });
     const estado = { confirmada: false };
     const { preview } = analisarFixture("loja-03");
-    const resultado = confirmar(preview, repositorio, estado);
+    const resultado = await confirmar(preview, repositorio, estado);
 
     expect(resultado.status).toBe("falha");
     expect(estado.confirmada).toBe(false);
     expect(repositorio.listar()).toHaveLength(0);
 
     const repositorioSaudavel = criarRepositorioRemanejamentosEmMemoria();
-    const novaTentativa = confirmar(preview, repositorioSaudavel, estado);
+    const novaTentativa = await confirmar(preview, repositorioSaudavel, estado);
 
     expect(novaTentativa.status).toBe("confirmada");
     expect(repositorioSaudavel.listar()).toHaveLength(2);

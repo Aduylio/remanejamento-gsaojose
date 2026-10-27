@@ -9,64 +9,34 @@ import {
   type ReactNode,
 } from "react";
 
-import { demoRemanejamentoRepository } from "@/lib/data/remanejamentos";
+import {
+  alternarItemSeparadoAction,
+  concluirSeparacaoAction,
+  criarRemanejamentoAction,
+  iniciarSeparacaoAction,
+} from "@/app/actions/remanejamentos";
 import type {
-  ItemRemanejamento,
   NovoRemanejamentoInput,
   Remanejamento,
 } from "@/lib/types";
 
 interface RemanejamentosContextValue {
   remanejamentos: Remanejamento[];
-  criarRemanejamento: (input: NovoRemanejamentoInput) => Remanejamento;
+  criarRemanejamento: (input: NovoRemanejamentoInput) => Promise<Remanejamento>;
   importarRemanejamentos: (novos: Remanejamento[]) => void;
-  iniciarSeparacao: (remanejamentoId: string) => void;
-  alternarItemSeparado: (remanejamentoId: string, itemId: string) => void;
-  concluirSeparacao: (remanejamentoId: string, responsavel: string) => void;
-  restaurarDemonstracao: () => void;
+  iniciarSeparacao: (remanejamentoId: string) => Promise<void>;
+  alternarItemSeparado: (
+    remanejamentoId: string,
+    itemId: string,
+  ) => Promise<void>;
+  concluirSeparacao: (
+    remanejamentoId: string,
+    responsavel: string,
+  ) => Promise<void>;
 }
 
 const RemanejamentosContext =
   createContext<RemanejamentosContextValue | null>(null);
-
-function gerarNumero(remanejamentos: Remanejamento[]): string {
-  const ano = new Date().getFullYear();
-  const prefixo = `REM-${ano}-`;
-  const maiorSequencia = remanejamentos
-    .filter((remanejamento) => remanejamento.numero.startsWith(prefixo))
-    .reduce((maior, remanejamento) => {
-      const sequencia = Number(remanejamento.numero.slice(prefixo.length));
-      return Number.isFinite(sequencia) ? Math.max(maior, sequencia) : maior;
-    }, 0);
-
-  return `${prefixo}${String(maiorSequencia + 1).padStart(4, "0")}`;
-}
-
-function validarNovoRemanejamento(input: NovoRemanejamentoInput): void {
-  if (input.destinos.length === 0) {
-    throw new Error("Selecione pelo menos uma loja de destino.");
-  }
-
-  if (input.destinos.includes(input.lojaOrigemId)) {
-    throw new Error("A loja de origem não pode ser também destino.");
-  }
-
-  if (input.produtos.length === 0) {
-    throw new Error("Adicione pelo menos um produto.");
-  }
-
-  input.produtos.forEach((produto, indice) => {
-    if (!produto.nome.trim()) {
-      throw new Error(`Informe o nome do produto ${indice + 1}.`);
-    }
-
-    if (!produto.quantidades.some((quantidade) => quantidade.quantidade > 0)) {
-      throw new Error(
-        `Informe uma quantidade maior que zero para o produto ${indice + 1}.`,
-      );
-    }
-  });
-}
 
 function validarLoteImportado(
   novos: Remanejamento[],
@@ -76,7 +46,9 @@ function validarLoteImportado(
     throw new Error("A importação não possui remanejamentos para inserir.");
   }
 
-  const idsExistentes = new Set(existentes.map((remanejamento) => remanejamento.id));
+  const idsExistentes = new Set(
+    existentes.map((remanejamento) => remanejamento.id),
+  );
   const idsNovos = new Set<string>();
 
   for (const remanejamento of novos) {
@@ -112,66 +84,43 @@ function validarLoteImportado(
   }
 }
 
-export function RemanejamentosProvider({ children }: { children: ReactNode }) {
-  const [remanejamentos, setRemanejamentos] = useState<Remanejamento[]>(() =>
-    demoRemanejamentoRepository.listar(),
+export function RemanejamentosProvider({
+  remanejamentosIniciais,
+  children,
+}: {
+  remanejamentosIniciais: Remanejamento[];
+  children: ReactNode;
+}) {
+  const [remanejamentos, setRemanejamentos] = useState<Remanejamento[]>(
+    () => remanejamentosIniciais,
   );
 
-  const criarRemanejamento = useCallback(
-    (input: NovoRemanejamentoInput): Remanejamento => {
-      validarNovoRemanejamento(input);
+  const aplicarAtualizacao = useCallback((atualizado: Remanejamento) => {
+    setRemanejamentos((atuais) => {
+      const existe = atuais.some((item) => item.id === atualizado.id);
 
-      const numero = gerarNumero(remanejamentos);
-      const agora = new Date().toISOString();
-
-      const destinos = input.destinos
-        .filter((lojaId) => lojaId !== input.lojaOrigemId)
-        .map((lojaId) => {
-          const itens: ItemRemanejamento[] = input.produtos.flatMap(
-            (produto) => {
-              const distribuicao = produto.quantidades.find(
-                (quantidade) => quantidade.lojaId === lojaId,
-              );
-
-              if (!distribuicao || distribuicao.quantidade <= 0) {
-                return [];
-              }
-
-              return [
-                {
-                  id: crypto.randomUUID(),
-                  nome: produto.nome.trim(),
-                  ean: produto.ean?.trim() || undefined,
-                  quantidade: distribuicao.quantidade,
-                  separado: false,
-                },
-              ];
-            },
-          );
-
-          return { lojaId, itens };
-        })
-        .filter((destino) => destino.itens.length > 0);
-
-      if (destinos.length === 0) {
-        throw new Error("Distribua pelo menos um produto entre os destinos.");
+      if (!existe) {
+        return [atualizado, ...atuais];
       }
 
-      const novoRemanejamento: Remanejamento = {
-        id: numero.toLowerCase(),
-        numero,
-        lojaOrigemId: input.lojaOrigemId,
-        destinos,
-        observacoes: input.observacoes?.trim() || undefined,
-        criadoEm: agora,
-        status: "pendente",
-      };
+      return atuais.map((item) =>
+        item.id === atualizado.id ? atualizado : item,
+      );
+    });
+  }, []);
 
-      setRemanejamentos((atuais) => [novoRemanejamento, ...atuais]);
+  const criarRemanejamento = useCallback(
+    async (input: NovoRemanejamentoInput): Promise<Remanejamento> => {
+      const resultado = await criarRemanejamentoAction(input);
 
-      return novoRemanejamento;
+      if (!resultado.ok) {
+        throw new Error(resultado.erro);
+      }
+
+      aplicarAtualizacao(resultado.remanejamento);
+      return resultado.remanejamento;
     },
-    [remanejamentos],
+    [aplicarAtualizacao],
   );
 
   const importarRemanejamentos = useCallback(
@@ -182,107 +131,50 @@ export function RemanejamentosProvider({ children }: { children: ReactNode }) {
     [remanejamentos],
   );
 
-  const iniciarSeparacao = useCallback((remanejamentoId: string) => {
-    setRemanejamentos((atuais) =>
-      atuais.map((remanejamento) => {
-        if (
-          remanejamento.id !== remanejamentoId ||
-          remanejamento.status !== "pendente"
-        ) {
-          return remanejamento;
-        }
+  const iniciarSeparacao = useCallback(
+    async (remanejamentoId: string): Promise<void> => {
+      const resultado = await iniciarSeparacaoAction(remanejamentoId);
 
-        return {
-          ...remanejamento,
-          status: "em_separacao",
-          iniciadoEm: new Date().toISOString(),
-        };
-      }),
-    );
-  }, []);
+      if (!resultado.ok) {
+        throw new Error(resultado.erro);
+      }
+
+      aplicarAtualizacao(resultado.remanejamento);
+    },
+    [aplicarAtualizacao],
+  );
 
   const alternarItemSeparado = useCallback(
-    (remanejamentoId: string, itemId: string) => {
-      setRemanejamentos((atuais) =>
-        atuais.map((remanejamento) => {
-          if (remanejamento.id !== remanejamentoId) {
-            return remanejamento;
-          }
-
-          const destinos = remanejamento.destinos.map((destino) => ({
-            ...destino,
-            itens: destino.itens.map((itemAtual) =>
-              itemAtual.id === itemId
-                ? { ...itemAtual, separado: !itemAtual.separado }
-                : itemAtual,
-            ),
-          }));
-
-          const agoraTemItemSeparado = destinos.some((destino) =>
-            destino.itens.some((itemAtual) => itemAtual.separado),
-          );
-
-          return {
-            ...remanejamento,
-            destinos,
-            status:
-              agoraTemItemSeparado && remanejamento.status === "pendente"
-                ? "em_separacao"
-                : remanejamento.status,
-            iniciadoEm:
-              agoraTemItemSeparado && remanejamento.status === "pendente"
-                ? new Date().toISOString()
-                : remanejamento.iniciadoEm,
-          };
-        }),
+    async (remanejamentoId: string, itemId: string): Promise<void> => {
+      const resultado = await alternarItemSeparadoAction(
+        remanejamentoId,
+        itemId,
       );
+
+      if (!resultado.ok) {
+        throw new Error(resultado.erro);
+      }
+
+      aplicarAtualizacao(resultado.remanejamento);
     },
-    [],
+    [aplicarAtualizacao],
   );
 
   const concluirSeparacao = useCallback(
-    (remanejamentoId: string, responsavel: string) => {
-      const nome = responsavel.trim();
-
-      if (nome.length < 3) {
-        throw new Error("Informe o nome do colaborador responsável.");
-      }
-
-      const remanejamentoAtual = remanejamentos.find(
-        (remanejamento) => remanejamento.id === remanejamentoId,
+    async (remanejamentoId: string, responsavel: string): Promise<void> => {
+      const resultado = await concluirSeparacaoAction(
+        remanejamentoId,
+        responsavel,
       );
 
-      if (!remanejamentoAtual) {
-        throw new Error("Remanejamento não encontrado.");
+      if (!resultado.ok) {
+        throw new Error(resultado.erro);
       }
 
-      const possuiItemPendente = remanejamentoAtual.destinos.some((destino) =>
-        destino.itens.some((itemAtual) => !itemAtual.separado),
-      );
-
-      if (possuiItemPendente) {
-        throw new Error("Marque todos os itens como separados antes de concluir.");
-      }
-
-      setRemanejamentos((atuais) =>
-        atuais.map((remanejamento) =>
-          remanejamento.id === remanejamentoId
-            ? {
-                ...remanejamento,
-                status: "separada",
-                responsavelSeparacao: nome,
-                separadoEm: new Date().toISOString(),
-              }
-            : remanejamento,
-        ),
-      );
+      aplicarAtualizacao(resultado.remanejamento);
     },
-    [remanejamentos],
+    [aplicarAtualizacao],
   );
-
-  const restaurarDemonstracao = useCallback(() => {
-    setRemanejamentos(demoRemanejamentoRepository.listar());
-  }, []);
 
   const value = useMemo(
     () => ({
@@ -292,7 +184,6 @@ export function RemanejamentosProvider({ children }: { children: ReactNode }) {
       iniciarSeparacao,
       alternarItemSeparado,
       concluirSeparacao,
-      restaurarDemonstracao,
     }),
     [
       remanejamentos,
@@ -301,7 +192,6 @@ export function RemanejamentosProvider({ children }: { children: ReactNode }) {
       iniciarSeparacao,
       alternarItemSeparado,
       concluirSeparacao,
-      restaurarDemonstracao,
     ],
   );
 

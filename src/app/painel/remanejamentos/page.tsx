@@ -4,6 +4,7 @@ import { ClipboardList, Filter } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useFilial } from "@/components/providers/filial-provider";
+import { useFiliais } from "@/components/providers/filiais-provider";
 import { useRemanejamentos } from "@/components/providers/remanejamentos-provider";
 import { CampoBusca } from "@/components/remanejamentos/campo-busca";
 import { TabelaRemanejamentos } from "@/components/remanejamentos/tabela-remanejamentos";
@@ -35,6 +36,7 @@ const FILTROS_RELACAO: ReadonlyArray<{
 export default function RemanejamentosDaLojaPage() {
   const loja = useFilial();
   const { remanejamentos } = useRemanejamentos();
+  const { getNomeLoja } = useFiliais();
   const [relacao, setRelacao] = useState<RelacaoFiltro>("todas");
   const [status, setStatus] = useState<StatusFiltro>("todos");
   const [termo, setTermo] = useState("");
@@ -51,8 +53,9 @@ export default function RemanejamentosDaLojaPage() {
         relacao,
         status,
         termo,
+        nomeLoja: getNomeLoja,
       }),
-    [remanejamentos, loja.id, relacao, status, termo],
+    [remanejamentos, loja.id, relacao, status, termo, getNomeLoja],
   );
 
   const possuiFiltros =
@@ -163,7 +166,7 @@ export default function RemanejamentosDaLojaPage() {
               description={
                 possuiFiltros
                   ? "Nenhum registro desta filial corresponde aos filtros selecionados."
-                  : "Esta filial ainda não possui movimentações na base de demonstração."
+                  : "Esta filial ainda não possui movimentações cadastradas."
               }
               action={
                 possuiFiltros ? (

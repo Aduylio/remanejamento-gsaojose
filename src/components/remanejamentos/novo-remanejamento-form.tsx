@@ -14,10 +14,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
+import { useFiliais } from "@/components/providers/filiais-provider";
 import { useRemanejamentos } from "@/components/providers/remanejamentos-provider";
-import { gerarNumeroRemanejamentoManual } from "@/app/comprador/remanejamentos/novo/manual/actions";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -33,7 +33,6 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
-import { LOJAS, getNomeLoja, isLojaId } from "@/data/lojas";
 import { formatarUnidades } from "@/lib/format";
 import type { LojaId, NovoRemanejamentoInput, Remanejamento } from "@/lib/types";
 
@@ -61,6 +60,7 @@ function somarQuantidade(
 export function NovoRemanejamentoForm() {
   const router = useRouter();
   const { criarRemanejamento } = useRemanejamentos();
+  const { filiais, getNomeLoja, isLojaId } = useFiliais();
   const [origem, setOrigem] = useState<LojaId | "">("");
   const [destinos, setDestinos] = useState<LojaId[]>([]);
   const [produtos, setProdutos] = useState<ProdutoFormulario[]>(() => [
@@ -69,15 +69,11 @@ export function NovoRemanejamentoForm() {
   const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [criado, setCriado] = useState<Remanejamento | null>(null);
-  const [numeroGerado, setNumeroGerado] = useState<string>("");
+  const [criando, setCriando] = useState(false);
   const proximaChave = useRef(2);
 
-  useEffect(() => {
-    gerarNumeroRemanejamentoManual().then(setNumeroGerado).catch(() => {});
-  }, []);
-
-  const lojasDisponiveis = LOJAS.filter((loja) => loja.id !== origem);
-  const lojasDeDestino = LOJAS.filter((loja) => destinos.includes(loja.id));
+  const lojasDisponiveis = filiais.filter((loja) => loja.id !== origem);
+  const lojasDeDestino = filiais.filter((loja) => destinos.includes(loja.id));
   const totalUnidades = produtos.reduce(
     (total, produto) => total + somarQuantidade(produto, destinos),
     0,
@@ -226,7 +222,7 @@ export function NovoRemanejamentoForm() {
     return null;
   }
 
-  function aoEnviar(evento: FormEvent<HTMLFormElement>) {
+  async function aoEnviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const mensagem = validar();
 
@@ -235,11 +231,12 @@ export function NovoRemanejamentoForm() {
       return;
     }
 
-    if (!origem) {
+    if (!origem || criando) {
       return;
     }
 
     setErro(null);
+    setCriando(true);
 
     const entrada: NovoRemanejamentoInput = {
       lojaOrigemId: origem,
@@ -256,13 +253,15 @@ export function NovoRemanejamentoForm() {
     };
 
     try {
-      setCriado(criarRemanejamento(entrada));
+      setCriado(await criarRemanejamento(entrada));
     } catch (error) {
       setErro(
         error instanceof Error
           ? error.message
           : "Não foi possível criar o remanejamento.",
       );
+    } finally {
+      setCriando(false);
     }
   }
 
@@ -313,7 +312,7 @@ export function NovoRemanejamentoForm() {
                 <option value="" disabled>
                   Selecione a loja de origem
                 </option>
-                {LOJAS.map((loja) => (
+                {filiais.map((loja) => (
                   <option key={loja.id} value={loja.id}>
                     {loja.nome}
                   </option>
@@ -618,13 +617,17 @@ export function NovoRemanejamentoForm() {
                 </Alert>
               ) : null}
 
-              <Button type="submit" className="mt-4 w-full">
+              <Button
+                type="submit"
+                className="mt-4 w-full"
+                disabled={criando}
+              >
                 <Truck className="size-4" aria-hidden="true" />
-                Criar remanejamento
+                {criando ? "Criando..." : "Criar remanejamento"}
               </Button>
 
               <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">
-                Nada é salvo permanentemente nesta demonstração.
+                O remanejamento será gravado no banco de dados.
               </p>
             </CardContent>
           </Card>
@@ -633,7 +636,7 @@ export function NovoRemanejamentoForm() {
             <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
               Ao criar, a filial de origem verá a tarefa na fila de separação.
-              Este fluxo usa apenas dados fictícios.
+              O número é reservado de forma atômica no banco.
             </span>
           </Alert>
         </aside>

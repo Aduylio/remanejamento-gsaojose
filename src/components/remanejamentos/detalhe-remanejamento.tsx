@@ -27,7 +27,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getNomeLoja, listarNomesDeLojas } from "@/data/lojas";
+import { useFiliais } from "@/components/providers/filiais-provider";
 import {
   formatarDataHora,
   formatarUnidades,
@@ -90,6 +90,7 @@ export function DetalheRemanejamento({
   lojaId?: LojaId;
 }) {
   const { remanejamentos } = useRemanejamentos();
+  const { getNomeLoja, listarNomesDeLojas } = useFiliais();
   const remanejamento = remanejamentos.find((item) => item.id === id);
   const voltarHref = lojaId
     ? "/painel/remanejamentos"
@@ -99,7 +100,7 @@ export function DetalheRemanejamento({
   if (!remanejamento) {
     return conteudoIndisponivel(
       "Remanejamento não encontrado",
-      "O número informado não existe na base de demonstração. Ele pode ter sido restaurado ou nunca ter sido criado.",
+      "O número informado não existe na base de dados. Ele pode ter sido removido ou nunca ter sido criado.",
       voltarHref,
       voltarLabel,
     );
@@ -376,8 +377,8 @@ export function DetalheRemanejamento({
                 aria-hidden="true"
               />
               <div className="text-xs leading-relaxed text-slate-500">
-                <p className="font-medium text-slate-700">Dados fictícios</p>
-                <p className="mt-1">{itens.length} linhas de item nesta demonstração. Nada é salvo permanentemente.</p>
+                <p className="font-medium text-slate-700">Dados persistidos</p>
+                <p className="mt-1">{itens.length} linhas de item registradas no banco de dados.</p>
               </div>
             </CardContent>
           </Card>

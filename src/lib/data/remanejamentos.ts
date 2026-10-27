@@ -1,5 +1,3 @@
-import { criarRemanejamentosDemo } from "@/data/remanejamentos-demo";
-import { getNomeLoja } from "@/data/lojas";
 import { formatarTextoBusca, obterItens } from "@/lib/format";
 import type {
   LojaId,
@@ -8,24 +6,12 @@ import type {
   StatusFiltro,
 } from "@/lib/types";
 
-/**
- * Camada de consulta da demonstração.
- * Quando o Supabase for integrado, esta interface pode ser substituída por
- * consultas reais sem alterar os componentes de apresentação.
- */
-export interface RemanejamentoRepository {
-  listar(): Remanejamento[];
-}
-
-export const demoRemanejamentoRepository: RemanejamentoRepository = {
-  listar: criarRemanejamentosDemo,
-};
-
 export interface FiltrosRemanejamento {
   lojaId?: LojaId;
   status?: StatusFiltro;
   relacao?: RelacaoFiltro;
   termo?: string;
+  nomeLoja?: (id: LojaId) => string;
 }
 
 export function ordenarPorData(
@@ -64,6 +50,7 @@ export function papelDaLoja(
 function correspondeAoTermo(
   remanejamento: Remanejamento,
   termoNormalizado: string,
+  nomeLoja?: (id: LojaId) => string,
 ): boolean {
   if (!termoNormalizado) {
     return true;
@@ -71,8 +58,10 @@ function correspondeAoTermo(
 
   const textos = [
     remanejamento.numero,
-    getNomeLoja(remanejamento.lojaOrigemId),
-    ...remanejamento.destinos.map((destino) => getNomeLoja(destino.lojaId)),
+    nomeLoja?.(remanejamento.lojaOrigemId) ?? remanejamento.lojaOrigemId,
+    ...remanejamento.destinos.map(
+      (destino) => nomeLoja?.(destino.lojaId) ?? destino.lojaId,
+    ),
     remanejamento.responsavelSeparacao ?? "",
     ...obterItens(remanejamento).flatMap((item) => [item.nome, item.ean ?? ""]),
   ];
@@ -116,7 +105,11 @@ export function filtrarRemanejamentos(
       return false;
     }
 
-    return correspondeAoTermo(remanejamento, termoNormalizado);
+    return correspondeAoTermo(
+      remanejamento,
+      termoNormalizado,
+      filtros.nomeLoja,
+    );
   });
 
   return ordenarPorData(filtrados);

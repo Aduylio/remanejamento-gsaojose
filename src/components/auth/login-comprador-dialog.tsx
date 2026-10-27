@@ -53,7 +53,7 @@ function FormularioLoginComprador({
   return (
     <form action={formAction} className="space-y-4">
       <div>
-        <Label htmlFor={idSenha}>Senha de demonstração</Label>
+        <Label htmlFor={idSenha}>Senha de acesso</Label>
         <div className="relative">
           <Input
             id={idSenha}
@@ -93,10 +93,10 @@ function FormularioLoginComprador({
 
       <Alert variant="warning">
         <span>
-          <strong className="font-semibold">Acesso demonstrativo.</strong> A
+          <strong className="font-semibold">Acesso restrito.</strong> A
           senha é validada no servidor, mas este fluxo não substitui uma
           autenticação de produção. Consulte o README do projeto para a senha
-          de demonstração.
+          de acesso configurada.
         </span>
       </Alert>
 

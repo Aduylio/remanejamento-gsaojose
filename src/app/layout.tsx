@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 
-import { RemanejamentosProvider } from "@/components/providers/remanejamentos-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,7 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-slate-50 font-sans text-slate-900">
-        <RemanejamentosProvider>{children}</RemanejamentosProvider>
+        {children}
       </body>
     </html>
   );

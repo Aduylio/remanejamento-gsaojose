@@ -1,0 +1,353 @@
+// Schema do PostgreSQL para o Remanejamento — Grupo São José.
+//
+// Os identificadores textuais das filiais são os mesmos usados pela aplicação
+// (`loja-01`, `loja-02`, ...), para que login, seleção de filial, importação
+// por CNPJ e os tipos do domínio compartilhem a mesma fonte de dados.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PapelUsuario {
+  comprador
+  filial
+  administrador
+
+  @@map("papel_usuario")
+}
+
+enum StatusRemanejamento {
+  pendente
+  em_separacao
+  separada
+
+  @@map("status_remanejamento")
+}
+
+enum StatusImportacao {
+  pendente
+  confirmada
+  falha
+
+  @@map("status_importacao")
+}
+
+model Filial {
+  id     String  @id @db.VarChar(20)
+  numero Int     @unique
+  nome   String  @db.VarChar(120)
+  cnpj   String  @unique @db.Char(14)
+  ativo  Boolean @default(true)
+
+  senhaHash        String?   @map("senha_hash") @db.VarChar(255)
+  precisaTrocarSenha Boolean @default(true) @map("precisa_trocar_senha")
+  senhaAlteradaEm  DateTime? @map("senha_alterada_em")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  usuarios             Usuario[]
+  remanejamentosOrigem Remanejamento[]        @relation("RemanejamentoOrigem")
+  destinos             DestinoRemanejamento[]
+  importacoesOrigem    Importacao[]           @relation("ImportacaoOrigem")
+  registrosImportacao  RegistroImportacao[]
+  tentativasLogin      TentativaLogin[]
+  bloqueiosOrigem      BloqueioOrigem[]
+  logsAuditoria        LogAuditoria[]
+
+  @@index([nome])
+  @@map("filiais")
+}
+
+model Usuario {
+  id        String       @id @default(uuid())
+  nome      String       @db.VarChar(120)
+  login     String       @unique @db.VarChar(160)
+  senhaHash String       @map("senha_hash") @db.VarChar(255)
+  papel     PapelUsuario
+  ativo     Boolean      @default(true)
+
+  filialId String? @map("filial_id") @db.VarChar(20)
+  filial   Filial? @relation(fields: [filialId], references: [id], onDelete: SetNull)
+
+  ultimoAcessoEm DateTime? @map("ultimo_acesso_em")
+  criadoEm       DateTime  @default(now()) @map("criado_em")
+  atualizadoEm   DateTime  @updatedAt @map("atualizado_em")
+
+  importacoes           Importacao[]
+  remanejamentosCriados Remanejamento[] @relation("RemanejamentoCriadoPor")
+  logsAuditoria         LogAuditoria[]
+
+  @@index([papel, ativo])
+  @@index([filialId])
+  @@map("usuarios")
+}
+
+model Importacao {
+  id         String           @id @default(uuid())
+  referencia String           @unique @db.VarChar(80)
+  arquivo    String           @db.VarChar(255)
+  status     StatusImportacao @default(pendente)
+
+  lojaOrigemFisicaId String @map("loja_origem_fisica_id") @db.VarChar(20)
+  lojaOrigemFisica   Filial @relation("ImportacaoOrigem", fields: [lojaOrigemFisicaId], references: [id], onDelete: Restrict)
+
+  usuarioCompradorId String?  @map("usuario_comprador_id")
+  usuarioComprador   Usuario? @relation(fields: [usuarioCompradorId], references: [id], onDelete: SetNull)
+
+  erros  Json? @map("erros")
+  avisos Json? @map("avisos")
+
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  confirmadoEm DateTime? @map("confirmado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
+
+  remanejamentos Remanejamento[]
+  registros      RegistroImportacao[]
+
+  @@index([lojaOrigemFisicaId])
+  @@index([usuarioCompradorId])
+  @@index([status, criadoEm])
+  @@map("importacoes")
+}
+
+model Remanejamento {
+  id     String              @id @default(uuid())
+  numero String              @unique @db.VarChar(80)
+  status StatusRemanejamento @default(pendente)
+
+  lojaOrigemId String @map("loja_origem_id") @db.VarChar(20)
+  lojaOrigem   Filial @relation("RemanejamentoOrigem", fields: [lojaOrigemId], references: [id], onDelete: Restrict)
+
+  criadoPorId String?  @map("criado_por_id")
+  criadoPor   Usuario? @relation("RemanejamentoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  importacaoId String?     @map("importacao_id")
+  importacao   Importacao? @relation(fields: [importacaoId], references: [id], onDelete: SetNull)
+
+  observacoes String? @db.Text
+
+  pedidoNumero String? @map("pedido_numero") @db.VarChar(80)
+  // Mantido como texto para preservar exatamente o valor lido da planilha
+  // (por exemplo, "12/03/2026") sem reinterpretação de fuso horário.
+  pedidoData   String? @map("pedido_data") @db.VarChar(20)
+  fornecedor   String? @db.VarChar(160)
+
+  responsavelSeparacao String?   @map("responsavel_separacao") @db.VarChar(120)
+  iniciadoEm           DateTime? @map("iniciado_em")
+  separadoEm           DateTime? @map("separado_em")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  destinos            DestinoRemanejamento[]
+  registrosImportacao RegistroImportacao[]
+
+  @@index([lojaOrigemId])
+  @@index([status, criadoEm])
+  @@index([criadoPorId])
+  @@index([importacaoId])
+  @@map("remanejamentos")
+}
+
+model DestinoRemanejamento {
+  id String @id @default(uuid())
+
+  remanejamentoId String        @map("remanejamento_id")
+  remanejamento   Remanejamento @relation(fields: [remanejamentoId], references: [id], onDelete: Cascade)
+
+  lojaId String @map("loja_id") @db.VarChar(20)
+  loja   Filial @relation(fields: [lojaId], references: [id], onDelete: Restrict)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  itens ItemRemanejamento[]
+
+  @@unique([remanejamentoId, lojaId])
+  @@index([lojaId])
+  @@map("destinos_remanejamento")
+}
+
+model ItemRemanejamento {
+  id String @id @default(uuid())
+
+  destinoId String               @map("destino_id")
+  destino   DestinoRemanejamento @relation(fields: [destinoId], references: [id], onDelete: Cascade)
+
+  nome       String  @db.VarChar(255)
+  ean        String? @db.VarChar(32)
+  quantidade Int
+  separado   Boolean @default(false)
+
+  codigoReduzido String? @map("codigo_reduzido") @db.VarChar(80)
+  laboratorio    String? @db.VarChar(160)
+
+  pedidoNumero String? @map("pedido_numero") @db.VarChar(80)
+  pedidoData   String? @map("pedido_data") @db.VarChar(20)
+  fornecedor   String? @db.VarChar(160)
+
+  cnpjFilial        String? @map("cnpj_filial") @db.Char(14)
+  nomeFilialArquivo String? @map("nome_filial_arquivo") @db.VarChar(160)
+  linhaImportada    Int?    @map("linha_importada")
+  repetidoNoPedido  Boolean @default(false) @map("repetido_no_pedido")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@index([destinoId])
+  @@index([ean])
+  @@index([codigoReduzido])
+  @@map("itens_remanejamento")
+}
+
+// Guarda as linhas lidas do arquivo de importação, inclusive as que
+// permaneceram na origem ou apresentaram erro, para rastreabilidade.
+model RegistroImportacao {
+  id String @id @default(uuid())
+
+  importacaoId String     @map("importacao_id")
+  importacao   Importacao @relation(fields: [importacaoId], references: [id], onDelete: Cascade)
+
+  remanejamentoId String?        @map("remanejamento_id")
+  remanejamento   Remanejamento? @relation(fields: [remanejamentoId], references: [id], onDelete: SetNull)
+
+  lojaDestinoId String? @map("loja_destino_id") @db.VarChar(20)
+  lojaDestino   Filial? @relation(fields: [lojaDestinoId], references: [id], onDelete: SetNull)
+
+  linha Int?
+
+  pedidoNumero String? @map("pedido_numero") @db.VarChar(80)
+  pedidoData   String? @map("pedido_data") @db.VarChar(20)
+  fornecedor   String? @db.VarChar(160)
+
+  cnpjFilial        String? @map("cnpj_filial") @db.Char(14)
+  nomeFilialArquivo String? @map("nome_filial_arquivo") @db.VarChar(160)
+
+  codigoReduzido String? @map("codigo_reduzido") @db.VarChar(80)
+  ean            String? @db.VarChar(32)
+  descricao      String? @db.VarChar(255)
+  laboratorio    String? @db.VarChar(160)
+
+  quantidade          Int?
+  quantidadeInformada String? @map("quantidade_informada") @db.VarChar(80)
+  erroQuantidade      String? @map("erro_quantidade") @db.Text
+  erroIdentificacao   String? @map("erro_identificacao") @db.Text
+  repetidoNoPedido    Boolean @default(false) @map("repetido_no_pedido")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([importacaoId])
+  @@index([remanejamentoId])
+  @@index([lojaDestinoId])
+  @@index([ean])
+  @@index([cnpjFilial])
+  @@map("registros_importacao")
+}
+
+// Contador atômico usado para reservar a sequência do número do
+// remanejamento. A chave pode representar o ano ("REM-2026") ou outro
+// escopo definido pela aplicação.
+model ContadorNumeracao {
+  chave        String   @id @db.VarChar(80)
+  valor        BigInt   @default(0)
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("contadores_numeracao")
+}
+
+enum ResultadoAuditoria {
+  sucesso
+  falha
+  bloqueio
+  negacao
+
+  @@map("resultado_auditoria")
+}
+
+model LogAuditoria {
+  id String @id @default(uuid())
+
+  tipoEvento String @map("tipo_evento") @db.VarChar(80)
+  acao       String @map("acao") @db.VarChar(120)
+  resultado  ResultadoAuditoria
+  descricao  String @db.Text
+
+  filialId String? @map("filial_id") @db.VarChar(20)
+  filial   Filial? @relation(fields: [filialId], references: [id], onDelete: SetNull)
+
+  usuarioId String? @map("usuario_id")
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  sessaoId String? @map("sessao_id") @db.VarChar(120)
+  origemId String? @map("origem_id") @db.VarChar(120)
+
+  ipObservado String? @map("ip_observado") @db.VarChar(80)
+  ipFonte     String? @map("ip_fonte") @db.VarChar(40)
+
+  geolocalizacao Json? @map("geolocalizacao")
+
+  entidadeTipo String? @map("entidade_tipo") @db.VarChar(60)
+  entidadeId   String? @map("entidade_id") @db.VarChar(80)
+
+  metadados Json? @map("metadados")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([criadoEm(sort: Desc)])
+  @@index([tipoEvento, criadoEm(sort: Desc)])
+  @@index([filialId, criadoEm(sort: Desc)])
+  @@index([resultado, criadoEm(sort: Desc)])
+  @@index([ipObservado, criadoEm(sort: Desc)])
+  @@map("logs_auditoria")
+}
+
+model TentativaLogin {
+  id String @id @default(uuid())
+
+  filialId String? @map("filial_id") @db.VarChar(20)
+  filial   Filial? @relation(fields: [filialId], references: [id], onDelete: SetNull)
+
+  ipObservado String @map("ip_observado") @db.VarChar(80)
+  chaveOrigem  String @map("chave_origem") @db.VarChar(160)
+
+  sucesso Boolean @default(false)
+  motivo  String? @db.VarChar(80)
+
+  userAgent String? @map("user_agent") @db.VarChar(255)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([chaveOrigem, criadoEm])
+  @@index([filialId, ipObservado, criadoEm])
+  @@index([criadoEm])
+  @@map("tentativas_login")
+}
+
+model BloqueioOrigem {
+  id String @id @default(uuid())
+
+  filialId String? @map("filial_id") @db.VarChar(20)
+  filial   Filial? @relation(fields: [filialId], references: [id], onDelete: SetNull)
+
+  ipObservado String @map("ip_observado") @db.VarChar(80)
+  chaveOrigem  String @unique @map("chave_origem") @db.VarChar(160)
+  escopo       String @default("filial_ip") @db.VarChar(40)
+
+  tentativasInvalidas Int @default(0) @map("tentativas_invalidas")
+  bloqueadoAte        DateTime @map("bloqueado_ate")
+  ultimoBloqueioEm    DateTime? @map("ultimo_bloqueio_em")
+  liberadoEm          DateTime? @map("liberado_em")
+  motivo              String? @db.VarChar(80)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@index([bloqueadoAte])
+  @@index([filialId, ipObservado])
+  @@map("bloqueios_origem")
+}

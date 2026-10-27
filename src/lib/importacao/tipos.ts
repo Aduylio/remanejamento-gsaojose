@@ -1,4 +1,4 @@
-import type { LojaId, Remanejamento } from "@/lib/types";
+import type { Loja, LojaId, Remanejamento } from "@/lib/types";
 
 export interface OcorrenciaImportacao {
   codigo: string;
@@ -91,6 +91,7 @@ export interface OpcoesAnaliseImportacao {
   importacaoId: string;
   referencia: string;
   criadoEm: string;
+  filiais: readonly Loja[];
 }
 
 export type ResultadoPreparacaoImportacao =

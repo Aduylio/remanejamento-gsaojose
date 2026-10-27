@@ -6,12 +6,34 @@ import { analisarArquivoTrier } from "@/lib/trier/analisador";
 import { gerarRemanejamentosDoTrier } from "@/lib/trier/gerador";
 import { sessaoCompradorAtiva } from "@/lib/auth/session";
 import type { PreviewTrier } from "@/lib/trier/tipos";
-import { criarRepositorioRemanejamentosEmMemoria } from "@/lib/importacao/repositorio";
+import type { Remanejamento } from "@/lib/types";
+import {
+  criarImportacaoTrierPendente,
+  criarRepositorioImportacoesPrisma,
+  importacaoJaConfirmada,
+} from "@/lib/db/remanejamentos";
+
+type ResultadoConfirmacaoTrier =
+  | { status: "ok"; remanejamentos: Remanejamento[] }
+  | { status: "duplicada"; mensagem: string }
+  | { status: "invalida"; erros: string[] }
+  | { status: "falha"; mensagem: string };
 
 const DURACAO_PREVIA_MS = 30 * 60 * 1000;
-const previasTrier = new Map<string, { preview: PreviewTrier; expiraEmMs: number }>();
-const confirmadasTrier = new Set<string>();
-const repositorioTrier = criarRepositorioRemanejamentosEmMemoria();
+const previasTrier = new Map<
+  string,
+  { preview: PreviewTrier; expiraEmMs: number }
+>();
+
+function criarReferenciaTrier(): string {
+  const data = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const sufixo = randomUUID().replace(/\D/g, "").slice(0, 8).toUpperCase();
+  return `TRIER-${data}-${sufixo}`;
+}
+
+function nomeArquivoSeguro(nome: string): string {
+  return nome.split(/[\\/]/).pop()?.trim() || "arquivo";
+}
 
 export async function prepararImportacaoTrier(formData: FormData): Promise<
   | { status: "ok"; preview: PreviewTrier; importacaoId: string }
@@ -30,28 +52,52 @@ export async function prepararImportacaoTrier(formData: FormData): Promise<
     const conteudo = Buffer.from(await arquivo.arrayBuffer());
     const preview = await analisarArquivoTrier(arquivo.name, conteudo);
     const importacaoId = randomUUID();
+    const origem = preview.grupos.find(
+      (grupo) => grupo.origemLojaId,
+    )?.origemLojaId;
+
+    if (origem) {
+      await criarImportacaoTrierPendente({
+        id: importacaoId,
+        referencia: criarReferenciaTrier(),
+        arquivo: nomeArquivoSeguro(arquivo.name),
+        lojaOrigemFisicaId: origem,
+        erros: preview.erros,
+        avisos: preview.avisos,
+      });
+    }
+
     previasTrier.set(importacaoId, {
       preview,
       expiraEmMs: Date.now() + DURACAO_PREVIA_MS,
     });
+
     return { status: "ok", preview, importacaoId };
-  } catch (e) {
+  } catch {
     return { status: "erro", mensagem: "Não foi possível processar o arquivo." };
   }
 }
 
-export async function confirmarImportacaoTrier(importacaoId: string) {
+export async function confirmarImportacaoTrier(
+  importacaoId: string,
+): Promise<ResultadoConfirmacaoTrier> {
   if (!(await sessaoCompradorAtiva())) {
     return { status: "falha", mensagem: "Sessão expirada." };
   }
 
-  if (confirmadasTrier.has(importacaoId)) {
-    return { status: "duplicada", mensagem: "Esta importação já foi confirmada." };
+  if (await importacaoJaConfirmada(importacaoId)) {
+    return {
+      status: "duplicada",
+      mensagem: "Esta importação já foi confirmada.",
+    };
   }
 
   const entrada = previasTrier.get(importacaoId);
   if (!entrada) {
-    return { status: "invalida", erros: ["Prévia não disponível. Envie o arquivo novamente."] };
+    return {
+      status: "invalida",
+      erros: ["Prévia não disponível. Envie o arquivo novamente."],
+    };
   }
 
   if (entrada.expiraEmMs <= Date.now()) {
@@ -60,15 +106,27 @@ export async function confirmarImportacaoTrier(importacaoId: string) {
   }
 
   if (!entrada.preview.podeConfirmar || entrada.preview.erros.length > 0) {
-    return { status: "invalida", erros: entrada.preview.erros.length > 0 ? entrada.preview.erros : ["Não é possível confirmar."] };
+    return {
+      status: "invalida",
+      erros:
+        entrada.preview.erros.length > 0
+          ? entrada.preview.erros
+          : ["Não é possível confirmar."],
+    };
   }
 
   try {
     const remanejamentos = gerarRemanejamentosDoTrier(entrada.preview.grupos);
-    repositorioTrier.inserirLoteAtomico(remanejamentos as any);
-    confirmadasTrier.add(importacaoId);
-    return { status: "ok", remanejamentos };
-  } catch (e: any) {
-    return { status: "falha", mensagem: e.message || "Falha ao gravar." };
+    const persistidos = await criarRepositorioImportacoesPrisma(
+      importacaoId,
+    ).inserirLoteAtomico(remanejamentos);
+
+    return { status: "ok", remanejamentos: persistidos };
+  } catch (error) {
+    return {
+      status: "falha",
+      mensagem:
+        error instanceof Error ? error.message : "Falha ao gravar.",
+    };
   }
 }

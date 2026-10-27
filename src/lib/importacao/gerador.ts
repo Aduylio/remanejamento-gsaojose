@@ -1,10 +1,10 @@
-import { getLoja } from "@/data/lojas";
 import type {
   DestinoPreview,
   PreviewImportacao,
 } from "@/lib/importacao/tipos";
 import type {
   ItemRemanejamento,
+  Loja,
   LojaId,
   Remanejamento,
   VinculoImportacao,
@@ -33,9 +33,7 @@ export function gerarRemanejamentosDaImportacao(
 ): Remanejamento[] {
   return preview.destinos
     .map((destino, indiceDestino) => {
-      const loja = getLoja(destino.lojaId);
-
-      if (!loja || destino.lojaId === preview.lojaOrigemId) {
+      if (destino.lojaId === preview.lojaOrigemId) {
         return null;
       }
 
@@ -110,14 +108,16 @@ export function gerarRemanejamentosDaImportacao(
 
 export function validarPreviewParaConfirmacao(
   preview: PreviewImportacao | null,
+  filiais: readonly Loja[],
 ): string[] {
   if (!preview) {
     return ["Prévia de importação não encontrada. Processe o arquivo novamente."];
   }
 
   const erros: string[] = preview.erros.map((erro) => erro.mensagem);
+  const lojasPorId = new Map(filiais.map((loja) => [loja.id, loja]));
 
-  if (!preview.lojaOrigemId || !getLoja(preview.lojaOrigemId)) {
+  if (!preview.lojaOrigemId || !lojasPorId.has(preview.lojaOrigemId)) {
     erros.push("Loja de origem inválida.");
   }
 
@@ -141,7 +141,7 @@ export function validarPreviewParaConfirmacao(
   const destinosVistos = new Set<LojaId>();
 
   for (const destino of preview.destinos) {
-    if (!getLoja(destino.lojaId)) {
+    if (!lojasPorId.has(destino.lojaId)) {
       erros.push(`Loja de destino inválida: ${destino.lojaId}.`);
       continue;
     }
@@ -160,7 +160,7 @@ export function validarPreviewParaConfirmacao(
 
     destinosVistos.add(destino.lojaId);
 
-    const lojaOficial = getLoja(destino.lojaId);
+    const lojaOficial = lojasPorId.get(destino.lojaId);
 
     if (lojaOficial && destino.cnpj !== lojaOficial.cnpj) {
       erros.push(

@@ -33,7 +33,7 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getNomeLoja, listarNomesDeLojas } from "@/data/lojas";
+import { useFiliais } from "@/components/providers/filiais-provider";
 import {
   formatarDataHora,
   formatarUnidades,
@@ -52,6 +52,8 @@ function ListaDeItens({
   interativo: boolean;
   onAlternar?: (itemId: string) => void;
 }) {
+  const { getNomeLoja } = useFiliais();
+
   return (
     <>
       {remanejamento.destinos.map((destino) => {
@@ -167,6 +169,7 @@ function itemPendente(
 
 export function SeparacaoDetalhe({ id }: { id: string }) {
   const loja = useFilial();
+  const { getNomeLoja, listarNomesDeLojas } = useFiliais();
   const {
     remanejamentos,
     iniciarSeparacao,
@@ -176,6 +179,8 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
   const [responsavel, setResponsavel] = useState("");
   const [dialogAberto, setDialogAberto] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [processando, setProcessando] = useState(false);
+  const [itemProcessando, setItemProcessando] = useState<string | null>(null);
 
   const remanejamento = remanejamentos.find((item) => item.id === id);
 
@@ -185,7 +190,7 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
         <EmptyState
           icon={PackageX}
           title="Remanejamento não encontrado"
-          description="O número informado não existe na base de demonstração."
+          description="O número informado não existe na base de dados."
           action={
             <Link
               href="/painel/separacao"
@@ -230,11 +235,50 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
   const concluida = remanejamento.status === "separada";
   const remanejamentoId = remanejamento.id;
 
-  function confirmarConclusao() {
+  async function iniciar() {
     setErro(null);
+    setProcessando(true);
 
     try {
-      concluirSeparacao(remanejamentoId, responsavel);
+      await iniciarSeparacao(remanejamentoId);
+    } catch (error) {
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível iniciar a separação.",
+      );
+    } finally {
+      setProcessando(false);
+    }
+  }
+
+  async function alternar(itemId: string) {
+    if (itemProcessando) {
+      return;
+    }
+
+    setErro(null);
+    setItemProcessando(itemId);
+
+    try {
+      await alternarItemSeparado(remanejamentoId, itemId);
+    } catch (error) {
+      setErro(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível atualizar o item.",
+      );
+    } finally {
+      setItemProcessando(null);
+    }
+  }
+
+  async function confirmarConclusao() {
+    setErro(null);
+    setProcessando(true);
+
+    try {
+      await concluirSeparacao(remanejamentoId, responsavel);
       setDialogAberto(false);
     } catch (error) {
       setErro(
@@ -243,6 +287,8 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
           : "Não foi possível concluir a separação.",
       );
       setDialogAberto(false);
+    } finally {
+      setProcessando(false);
     }
   }
 
@@ -293,7 +339,7 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
             <CardHeader>
               <CardTitle>Resumo da conclusão</CardTitle>
               <CardDescription>
-                Registro demonstrativo da separação finalizada.
+                Registro da separação finalizada.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 pt-2 sm:grid-cols-3 sm:pt-2">
@@ -359,10 +405,11 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
                 </span>
                 <Button
                   size="sm"
-                  onClick={() => iniciarSeparacao(remanejamento.id)}
+                  onClick={iniciar}
+                  disabled={processando}
                   className="shrink-0 self-start"
                 >
-                  Iniciar separação
+                  {processando ? "Iniciando..." : "Iniciar separação"}
                 </Button>
               </div>
             </Alert>
@@ -419,9 +466,7 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
               <ListaDeItens
                 remanejamento={remanejamento}
                 interativo
-                onAlternar={(itemId) =>
-                  alternarItemSeparado(remanejamento.id, itemId)
-                }
+                onAlternar={alternar}
               />
 
               {remanejamento.observacoes ? (
@@ -484,7 +529,7 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
 
                   <Button
                     className="w-full"
-                    disabled={!podeConcluir}
+                    disabled={!podeConcluir || processando}
                     onClick={() => {
                       setErro(null);
                       setDialogAberto(true);
@@ -495,8 +540,8 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
                   </Button>
 
                   <p className="text-xs leading-relaxed text-slate-500">
-                    A conclusão é definitiva nesta demonstração. Recarregar a
-                    página restaura os dados fictícios.
+                    A conclusão é definitiva. Os dados ficam registrados no
+                    banco de dados.
                   </p>
                 </CardContent>
               </Card>
@@ -541,8 +586,7 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
                   aria-hidden="true"
                 />
                 <span>
-                  Depois de concluir, os itens não poderão ser desmarcados nesta
-                  demonstração.
+                  Depois de concluir, os itens não poderão ser desmarcados.
                 </span>
               </Alert>
 
@@ -574,9 +618,9 @@ export function SeparacaoDetalhe({ id }: { id: string }) {
                 >
                   Cancelar
                 </Button>
-                <Button onClick={confirmarConclusao}>
+                <Button onClick={confirmarConclusao} disabled={processando}>
                   <CheckCircle2 className="size-4" aria-hidden="true" />
-                  Confirmar conclusão
+                  {processando ? "Concluindo..." : "Confirmar conclusão"}
                 </Button>
               </div>
             </div>

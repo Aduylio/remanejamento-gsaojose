@@ -1,11 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { GrupoTrier } from "@/lib/trier/tipos";
 import type { ItemRemanejamento, Remanejamento } from "@/lib/types";
-import { getLoja } from "@/data/lojas";
 
 export function gerarRemanejamentosDoTrier(
   grupos: GrupoTrier[],
-  opcoes?: { usuarioComprador?: string },
 ): Remanejamento[] {
   const agora = new Date().toISOString();
 
@@ -24,7 +22,7 @@ export function gerarRemanejamentosDoTrier(
 
       const remanejamento: Remanejamento = {
         id: randomUUID(),
-        numero: grupo.controle, // Use control number as description/number
+        numero: `TRIER-${grupo.controle}`,
         lojaOrigemId: grupo.origemLojaId!,
         destinos: [
           {

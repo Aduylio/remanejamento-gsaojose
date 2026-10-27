@@ -1,4 +1,3 @@
-import { getLoja, isLojaId } from "@/data/lojas";
 import type { LojaId } from "@/lib/types";
 
 export interface MapeamentoTrier {
@@ -99,9 +98,4 @@ export function identificarLojaTrier(
   }
 
   return { lojaId: "loja-01", encontrado: false };
-}
-
-export function getLojaTrierInfo(lojaId: LojaId) {
-  const loja = getLoja(lojaId);
-  return loja;
 }

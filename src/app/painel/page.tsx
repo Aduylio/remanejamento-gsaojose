@@ -1,52 +1,20 @@
 "use client";
 
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Clock,
-  PackageCheck,
-  PackageOpen,
-  Truck,
-} from "lucide-react";
+import { Clock, PackageCheck, PackageOpen, Truck } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { useFilial } from "@/components/providers/filial-provider";
 import { useRemanejamentos } from "@/components/providers/remanejamentos-provider";
-import { TabelaRemanejamentos } from "@/components/remanejamentos/tabela-remanejamentos";
-import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { Select } from "@/components/ui/select";
 import { StatCard } from "@/components/ui/stat-card";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { getNomeLoja } from "@/data/lojas";
-import {
-  filtrarRemanejamentos,
-  ordenarPorData,
-} from "@/lib/data/remanejamentos";
-import {
-  formatarData,
-  formatarDataHora,
-  obterItens,
-  resumirPorStatus,
-  totalDeUnidades,
-} from "@/lib/format";
-import { FILTROS_STATUS } from "@/lib/status";
-import type { StatusFiltro } from "@/lib/types";
+import { filtrarRemanejamentos } from "@/lib/data/remanejamentos";
+import { resumirPorStatus } from "@/lib/format";
 
 export default function PainelPage() {
   const loja = useFilial();
   const { remanejamentos } = useRemanejamentos();
-  const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos");
 
   const daFilial = useMemo(
     () => filtrarRemanejamentos(remanejamentos, { lojaId: loja.id }),
@@ -67,19 +35,6 @@ export default function PainelPage() {
       ),
     [daFilial, loja.id],
   );
-  const emAberto = useMemo(
-    () => ordenarPorData(comoOrigem.filter((item) => item.status !== "separada")),
-    [comoOrigem],
-  );
-  const maisAntigo = emAberto.length > 0 ? emAberto[emAberto.length - 1] : undefined;
-  const recentes = useMemo(
-    () =>
-      filtrarRemanejamentos(daFilial, {
-        status: statusFiltro,
-      }),
-    [daFilial, statusFiltro],
-  );
-
   return (
     <div className="space-y-6">
       <PageHeader

@@ -19,13 +19,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
-import { LOJAS } from "@/data/lojas";
+import { useFiliais } from "@/components/providers/filiais-provider";
 import { filtrarRemanejamentos } from "@/lib/data/remanejamentos";
 import { FILTROS_STATUS } from "@/lib/status";
 import type { LojaId, StatusFiltro } from "@/lib/types";
 
 export default function RemanejamentosDoCompradorPage() {
   const { remanejamentos } = useRemanejamentos();
+  const { filiais, getNomeLoja } = useFiliais();
   const [lojaFiltro, setLojaFiltro] = useState<"todas" | LojaId>("todas");
   const [status, setStatus] = useState<StatusFiltro>("todos");
   const [termo, setTermo] = useState("");
@@ -36,8 +37,9 @@ export default function RemanejamentosDoCompradorPage() {
         lojaId: lojaFiltro === "todas" ? undefined : lojaFiltro,
         status,
         termo,
+        nomeLoja: getNomeLoja,
       }),
-    [remanejamentos, lojaFiltro, status, termo],
+    [remanejamentos, lojaFiltro, status, termo, getNomeLoja],
   );
 
   const possuiFiltros =
@@ -89,7 +91,7 @@ export default function RemanejamentosDoCompradorPage() {
                 }
               >
                 <option value="todas">Todas as lojas</option>
-                {LOJAS.map((loja) => (
+                {filiais.map((loja) => (
                   <option key={loja.id} value={loja.id}>
                     {loja.nome}
                   </option>
@@ -154,7 +156,7 @@ export default function RemanejamentosDoCompradorPage() {
               description={
                 possuiFiltros
                   ? "Nenhum registro corresponde aos filtros selecionados. Ajuste a busca ou limpe os filtros."
-                  : "Ainda não há remanejamentos na base de demonstração."
+                  : "Ainda não há remanejamentos cadastrados."
               }
               action={
                 possuiFiltros ? (

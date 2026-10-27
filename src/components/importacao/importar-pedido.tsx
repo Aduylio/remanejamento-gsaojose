@@ -20,6 +20,7 @@ import {
   confirmarImportacaoDoPedido,
   prepararImportacaoDoPedido,
 } from "@/app/comprador/importar/actions";
+import { useFiliais } from "@/components/providers/filiais-provider";
 import { useRemanejamentos } from "@/components/providers/remanejamentos-provider";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
-import { getCnpjFormatadoLoja, getRotuloLoja, LOJAS } from "@/data/lojas";
 import { formatarCnpj } from "@/lib/cnpj";
 import type {
   DestinoPreview,
@@ -78,6 +78,7 @@ function Resumo({
 }: {
   preview: PreviewImportacao;
 }) {
+  const { getRotuloLoja } = useFiliais();
   const itens = [
     {
       label: "Loja física de origem",
@@ -207,6 +208,7 @@ function PainelPreview({
   confirmando: boolean;
   onConfirmar: () => void;
 }) {
+  const { getRotuloLoja } = useFiliais();
   const temErros = preview.erros.length > 0;
   const podeConfirmar = preview.podeConfirmar && token.length > 0;
 
@@ -309,7 +311,7 @@ function PainelPreview({
       <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-slate-500">
           A confirmação é revalidada no servidor e não cria registros parciais.
-          Nesta demonstração, os dados continuam apenas na sessão local.
+          Todos os remanejamentos são gravados em uma única transação.
         </p>
         <Button
           onClick={onConfirmar}
@@ -366,8 +368,8 @@ function PainelConfirmacao({
               : `${resultado.remanejamentos.length} remanejamento(s) criado(s) com ${formatarUnidades(unidades)}.`}
           </p>
           <p className="mt-2 text-xs text-slate-500">
-            Esta é uma demonstração: recarregar a página restaura os dados
-            fictícios e os remanejamentos importados não são permanentes.
+            Os remanejamentos foram gravados no banco e permanecem disponíveis
+            após recarregar a página.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -391,6 +393,7 @@ function PainelConfirmacao({
 
 export function ImportarPedido() {
   const { importarRemanejamentos } = useRemanejamentos();
+  const { filiais, getRotuloLoja, getCnpjFormatadoLoja } = useFiliais();
   const [lojaOrigemId, setLojaOrigemId] = useState<LojaId | "">("");
   const [resultado, setResultado] =
     useState<ResultadoPreparacaoImportacao | null>(null);
@@ -464,7 +467,7 @@ export function ImportarPedido() {
           }
         } catch {
           setErroLocal(
-            "A importação foi confirmada no servidor, mas os dados não puderam ser exibidos nesta sessão. Recarregue a página para consultar a lista.",
+            "A importação foi confirmada no servidor, mas os dados não puderam ser exibidos agora. Recarregue a página para consultar a lista.",
           );
           setConfirmacao(resposta);
         }
@@ -473,7 +476,7 @@ export function ImportarPedido() {
       }
     } catch {
       setErroLocal(
-        "Não foi possível confirmar a importação. Nenhum remanejamento foi criado nesta sessão.",
+        "Não foi possível confirmar a importação. Nenhum remanejamento foi criado.",
       );
     } finally {
       setConfirmando(false);
@@ -500,10 +503,9 @@ export function ImportarPedido() {
         <Alert variant="info">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <p>
-            <strong className="font-semibold">Demonstração sem banco de dados.</strong>{" "}
-            A importação é validada e confirmada no servidor, mas os
-            remanejamentos ficam apenas na memória desta sessão. Nenhum dado é
-            enviado para produção.
+            <strong className="font-semibold">Importação persistente.</strong>{" "}
+            A importação é validada e confirmada no servidor. Os
+            remanejamentos só são gravados no banco após a confirmação.
           </p>
         </Alert>
 
@@ -542,7 +544,7 @@ export function ImportarPedido() {
                     required
                   >
                     <option value="">Selecione a loja</option>
-                    {LOJAS.map((loja) => (
+                    {filiais.map((loja) => (
                       <option key={loja.id} value={loja.id}>
                         {getRotuloLoja(loja.id)} —{" "}
                         {getCnpjFormatadoLoja(loja.id)}

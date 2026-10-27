@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getNomeLoja } from "@/data/lojas";
+import { useFiliais } from "@/components/providers/filiais-provider";
 import { formatarData, totalDeLinhas, totalDeUnidades } from "@/lib/format";
 import type { LojaId, Remanejamento } from "@/lib/types";
 
@@ -33,7 +33,10 @@ function PapelDaLoja({
   return null;
 }
 
-function nomesDosDestinos(remanejamento: Remanejamento): string {
+function nomesDosDestinos(
+  remanejamento: Remanejamento,
+  getNomeLoja: (id: LojaId) => string,
+): string {
   return remanejamento.destinos
     .map((destino) => getNomeLoja(destino.lojaId))
     .join(", ");
@@ -48,6 +51,8 @@ export function TabelaRemanejamentos({
   basePath: string;
   lojaId?: LojaId;
 }) {
+  const { getNomeLoja } = useFiliais();
+
   return (
     <>
       <div className="hidden overflow-x-auto md:block">
@@ -101,7 +106,7 @@ export function TabelaRemanejamentos({
                   {getNomeLoja(remanejamento.lojaOrigemId)}
                 </td>
                 <td className="max-w-44 px-3 py-3 text-slate-600">
-                  {nomesDosDestinos(remanejamento)}
+                  {nomesDosDestinos(remanejamento, getNomeLoja)}
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 text-slate-600">
                   <span className="flex items-center gap-1.5">
@@ -159,7 +164,7 @@ export function TabelaRemanejamentos({
                 </p>
                 <p>
                   <span className="text-slate-500">Destinos:</span>{" "}
-                  {nomesDosDestinos(remanejamento)}
+                  {nomesDosDestinos(remanejamento, getNomeLoja)}
                 </p>
               </div>
 

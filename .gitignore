@@ -40,3 +40,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# Arquivos locais de ferramentas de desenvolvimento
+.agents/
+.claude/
+.cursor/
+.devin/
+prisma.config.ts.bak

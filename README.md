@@ -2,7 +2,7 @@
 
 Sistema interno para controle de remanejamentos entre filiais do Grupo São José. A aplicação permite cadastrar remanejamentos entre lojas, importar pedidos agrupados em `.csv`/`.xlsx`, importar remanejamentos do Trier, acompanhar a separação na filial de origem e consultar os recebimentos previstos nos destinos.
 
-> **Ambiente de demonstração.** Todos os nomes, produtos, EANs, pessoas e movimentações são fictícios. Não há banco de dados, persistência permanente ou autenticação de produção nesta etapa.
+> **Sistema interno.** Os fluxos principais usam PostgreSQL via Prisma ORM 6.19.3. O login por filial usa bcrypt, há auditoria persistente e bloqueio temporário por origem. A porta padrão da aplicação é `4646`.
 
 ## Stack
 
@@ -13,7 +13,8 @@ Sistema interno para controle de remanejamentos entre filiais do Grupo São Jos�
 - [Lucide React](https://lucide.dev/) para ícones
 - [read-excel-file](https://www.npmjs.com/package/read-excel-file) para leitura de `.xlsx`
 - [Vitest](https://vitest.dev/) para testes automatizados
-- Próximos passos previstos: Supabase/PostgreSQL e Vercel
+- PostgreSQL e Prisma ORM 6.19.3
+- bcryptjs para hash e verificação de senhas de filial
 
 ## Como executar
 
@@ -33,13 +34,13 @@ npm run build
 npm run start
 ```
 
-## Acessos de demonstração
+## Acessos
 
 ### Filial
 
-Na tela inicial, escolha qualquer loja entre **Loja 01** e **Loja 11** e clique em **Entrar**. Não há senha para a área da filial nesta demonstração.
+Na tela inicial, escolha uma das 11 filiais cadastradas no PostgreSQL e informe a senha da filial. As credenciais iniciais são provisórias e precisam ser trocadas no primeiro acesso.
 
-A filial selecionada vê:
+A filial autenticada vê:
 
 - visão geral com pendências, separações em andamento e recebimentos;
 - todos os remanejamentos em que é origem ou destino;
@@ -47,17 +48,60 @@ A filial selecionada vê:
 
 ### Comprador
 
-Abra **Login comprador**, informe a senha abaixo e confirme.
-
-```text
-farmacia2026
-```
-
-A senha é conferida no servidor por `scrypt`. Nenhuma senha em texto puro fica no código do navegador. O hash de demonstração pode ser substituído pela variável `COMPRADOR_SENHA_HASH` (veja `.env.example`).
+Abra **Login comprador**, informe a senha configurada e confirme. A senha é conferida no servidor por `scrypt`; o hash pode ser definido em `COMPRADOR_SENHA_HASH` (veja `.env.example`). Não há senha padrão de produção.
 
 O comprador vê toda a rede, pode criar novos remanejamentos, importar pedidos agrupados e acompanhar o andamento, mas não altera itens da separação: essa ação pertence à loja de origem.
 
 A tela **Importar pedido agrupado** fica em `/comprador/importar` e exige a sessão do comprador.
+
+## Autenticação por filial, auditoria e bloqueios
+
+### Credenciais iniciais
+
+O seed cria uma credencial provisória apenas para filiais sem `senha_hash`. Filiais que já possuem hash são preservadas. O algoritmo determinístico é:
+
+1. Nome da filial sem acentos, sem caracteres não alfanuméricos e em minúsculas.
+2. Os 8 primeiros caracteres do nome normalizado (ou `filial` se vazio).
+3. Os 4 últimos dígitos do CNPJ.
+
+Exemplo: `Matriz` + `10846217000170` → `matriz0170`.
+
+A senha nunca é persistida em texto puro; o banco guarda somente o hash bcrypt. Para consultar as credenciais provisórias de forma controlada, rode manualmente no servidor:
+
+```bash
+CONFIRMAR_EXIBICAO=1 npm run credenciais:iniciais
+```
+
+O comando imprime apenas filiais com `precisa_trocar_senha = true` e não grava log persistente. No primeiro acesso, o sistema exige a troca da senha em `/conta/trocar-senha`.
+
+### Bloqueio por origem
+
+- Três tentativas inválidas consecutivas em até dois minutos bloqueiam a combinação filial + IP por dois minutos.
+- A contagem e o bloqueio ficam no PostgreSQL (`tentativas_login` e `bloqueios_origem`), com advisory lock transacional por origem para segurança sob concorrência.
+- A expiração é calculada comparando `bloqueado_ate` com o horário do servidor; não há timers em memória e o bloqueio sobrevive a reinícios.
+- Tentativas durante o bloqueio são registradas como `motivo = bloqueado` e não geram novo bloqueio permanente.
+- O bloqueio global por IP é opcional (`BLOQUEIO_GLOBAL_ATIVO=true`) e deve ser avaliado com cuidado em redes com NAT compartilhado.
+- Cookies de sessão de filial são assinados com HMAC, `HttpOnly`, `SameSite=Lax` e `Secure` quando `COOKIE_SEGURO=true`. A versão da credencial invalida sessões antigas após a troca de senha.
+
+### IP e geolocalização
+
+- `X-Forwarded-For`, `X-Real-IP`, `CF-Connecting-IP` e `True-Client-IP` só são usados quando `TRUSTED_PROXIES` está configurado. O proxy deve remover cabeçalhos enviados pelo cliente e reescrevê-los.
+- Sem proxy confiável, o IP observado fica indisponível; o login não é bloqueado por isso.
+- Coordenadas enviadas pelo navegador são validadas (faixa geográfica e números finitos) e registradas com `origem = informada_pelo_cliente`, nunca como estimativa por IP. Nenhuma localização é inventada.
+
+### LGPD e retenção
+
+- Finalidade: segurança da autenticação, prevenção a fraude/abuso e rastreabilidade de operações críticas.
+- Dados coletados: IP observado, origem da requisição, filial/sessão, tipo e resultado da ação, descrição objetiva, entidade afetada e, quando validamente fornecida, geolocalização.
+- Senhas, hashes, tokens e segredos nunca são gravados na auditoria.
+- Recomendação de retenção: logs de auditoria por 180 dias e tentativas de login por 90 dias, salvo exigência legal ou investigação em andamento. A limpeza deve ser feita por rotina administrativa, nunca pela interface comum.
+- O acesso à página `/comprador/auditoria` é restrito à sessão do comprador. Não há ação de edição ou exclusão de logs na aplicação.
+
+### Eventos auditados
+
+Login (sucesso, senha incorreta, bloqueio e tentativa durante bloqueio), expiração de bloqueio, logout, criação/início/conclusão de separação de remanejamentos, preparação (validação) e confirmação de importações, tentativas sem autorização e alteração de credenciais de filial.
+
+A página de auditoria exibe no máximo 100 registros por consulta, ordenados do mais recente para o mais antigo, com filtros por período, filial, tipo, resultado e IP. A paginação usa cursor por data/hora + identificador; o limite de exibição não remove registros do banco.
 
 ## Importação de pedido agrupado
 
@@ -148,23 +192,21 @@ A suíte cobre mapeamento por CNPJ, zeros à esquerda, CNPJ desconhecido, exclus
 - Separação item por item, progresso, responsável e confirmação final.
 - Restauração dos dados fictícios pelo botão **Restaurar dados** no aviso de demonstração.
 
-## O que é somente demonstração
+## Limitações e controles remanescentes
 
-- Os dados vivem apenas no estado React da sessão. **Recarregar a página restaura os 12 remanejamentos fictícios.**
-- Não há Supabase, PostgreSQL, API de escrita ou qualquer persistência.
-- O cache de prévias da importação e o repositório de confirmação existem apenas na memória do processo. Não há armazenamento durável, fila ou recuperação após reinício.
-- Não há cadastro real de usuários, perfis, permissões ou auditoria.
-- O cookie da filial é apenas uma seleção de contexto; ele não representa autenticação real.
-- O cookie do comprador é assinado com HMAC, mas usa um segredo local de demonstração se `SESSAO_SECRET` não for configurado.
-- Não há envio de mercadoria, estoque fiscal, integração de transportadora ou impressão.
-- Datas, produtos, EANs, pessoas e lojas não correspondem a dados reais.
+- A prévia de importação ainda usa cache em memória por 30 minutos. A confirmação é persistida no PostgreSQL e é idempotente, mas um reinício do processo exige reenviar o arquivo.
+- A senha da filial é compartilhada pela equipe da loja. A auditoria identifica a filial/sessão, não um funcionário individual. Para responsabilização individual, é necessário evoluir para usuários nominais.
+- A aplicação não implementa envio de mercadoria, estoque fiscal, integração de transportadora ou impressão.
+- O seed não roda automaticamente no build. Execute-o apenas de forma deliberada.
+- Antes de produção: configurar `SESSAO_SECRET` forte, `COOKIE_SEGURO=true` com HTTPS, `TRUSTED_PROXIES` conforme o proxy real e revisar a política de retenção.
 
 ## Estrutura principal
 
 ```text
 src/
 ├── app/
-│   ├── login/                  # tela inicial e server actions de acesso
+│   ├── login/                  # seleção de filial, senha e login do comprador
+│   ├── conta/trocar-senha/     # troca obrigatória da credencial provisória
 │   ├── painel/                 # área da filial (protegida)
 │   │   ├── remanejamentos/     # lista e detalhe
 │   │   └── separacao/          # fila e detalhe de separação

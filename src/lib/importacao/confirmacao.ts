@@ -3,14 +3,16 @@ import {
   validarPreviewParaConfirmacao,
 } from "@/lib/importacao/gerador";
 import type { PreviewImportacao } from "@/lib/importacao/tipos";
-import type { Remanejamento } from "@/lib/types";
+import type { Loja, Remanejamento } from "@/lib/types";
 
 export interface RepositorioImportacoes {
   /**
    * Contrato transacional: grava todos os remanejamentos ou nenhum.
-   * Em uma integração com Supabase, esta operação deve usar uma transação.
+   * Retorna os registros persistidos, com os identificadores definitivos.
    */
-  inserirLoteAtomico(remanejamentos: Remanejamento[]): void;
+  inserirLoteAtomico(
+    remanejamentos: Remanejamento[],
+  ): Remanejamento[] | Promise<Remanejamento[]>;
 }
 
 export type ResultadoConfirmacao =
@@ -28,8 +30,9 @@ export interface DependenciasConfirmacao {
   preview: PreviewImportacao | null;
   jaConfirmada: boolean;
   repositorio: RepositorioImportacoes;
-  marcarConfirmada: () => void;
+  marcarConfirmada: () => void | Promise<void>;
   usuarioComprador?: string;
+  filiais: readonly Loja[];
 }
 
 /**
@@ -37,9 +40,9 @@ export interface DependenciasConfirmacao {
  * gravação atômica. A importação só é marcada como confirmada depois do
  * sucesso da gravação; uma segunda tentativa não cria novos registros.
  */
-export function confirmarImportacao(
+export async function confirmarImportacao(
   dependencias: DependenciasConfirmacao,
-): ResultadoConfirmacao {
+): Promise<ResultadoConfirmacao> {
   if (dependencias.jaConfirmada) {
     return {
       status: "duplicada",
@@ -48,7 +51,10 @@ export function confirmarImportacao(
     };
   }
 
-  const erros = validarPreviewParaConfirmacao(dependencias.preview);
+  const erros = validarPreviewParaConfirmacao(
+    dependencias.preview,
+    dependencias.filiais,
+  );
 
   if (erros.length > 0) {
     return { status: "invalida", erros };
@@ -78,7 +84,7 @@ export function confirmarImportacao(
   }
 
   if (remanejamentos.length === 0) {
-    dependencias.marcarConfirmada();
+    await dependencias.marcarConfirmada();
 
     return {
       status: "confirmada",
@@ -88,8 +94,12 @@ export function confirmarImportacao(
     };
   }
 
+  let persistidos: Remanejamento[];
+
   try {
-    dependencias.repositorio.inserirLoteAtomico(remanejamentos);
+    persistidos = await dependencias.repositorio.inserirLoteAtomico(
+      remanejamentos,
+    );
   } catch {
     return {
       status: "falha",
@@ -98,12 +108,12 @@ export function confirmarImportacao(
     };
   }
 
-  dependencias.marcarConfirmada();
+  await dependencias.marcarConfirmada();
 
   return {
     status: "confirmada",
     referencia: preview.referencia,
-    remanejamentos,
+    remanejamentos: persistidos,
     nadaACriar: false,
   };
 }

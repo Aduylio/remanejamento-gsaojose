@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { FilialShell } from "@/components/layout/filial-shell";
+import { listarFiliais } from "@/lib/db/filiais";
+import { listarRemanejamentos } from "@/lib/db/remanejamentos";
 import {
   obterFilialSelecionada,
   sessaoCompradorAtiva,
@@ -12,7 +14,11 @@ export default async function PainelLayout({
 }: {
   children: ReactNode;
 }) {
-  const loja = await obterFilialSelecionada();
+  const [loja, filiais, remanejamentos] = await Promise.all([
+    obterFilialSelecionada(),
+    listarFiliais(),
+    listarRemanejamentos(),
+  ]);
 
   if (!loja) {
     if (await sessaoCompradorAtiva()) {
@@ -22,5 +28,17 @@ export default async function PainelLayout({
     redirect("/login?erro=filial");
   }
 
-  return <FilialShell loja={loja}>{children}</FilialShell>;
+  if (loja.precisaTrocarSenha) {
+    redirect("/conta/trocar-senha");
+  }
+
+  return (
+    <FilialShell
+      loja={loja}
+      filiais={filiais}
+      remanejamentosIniciais={remanejamentos}
+    >
+      {children}
+    </FilialShell>
+  );
 }

@@ -8,7 +8,6 @@ import { useState, type ReactNode } from "react";
 
 import { sair } from "@/app/login/actions";
 import { BrandMark } from "@/components/brand-mark";
-import { DemoBanner } from "@/components/layout/demo-banner";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -163,19 +162,17 @@ export function AppShell({
             <Menu className="size-5" />
           </Button>
           <BrandMark compact />
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-            Demo
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            {mode === "filial" ? "Filial" : "Comprador"}
           </span>
         </header>
-
-        <DemoBanner />
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
 
         <footer className="border-t border-slate-200 bg-white px-4 py-4 text-center text-xs text-slate-400 sm:px-6 lg:px-8 lg:text-left">
-          Remanejamento de mercadorias · Dados fictícios para demonstração
+          Remanejamento de mercadorias · Grupo São José
         </footer>
       </div>
 

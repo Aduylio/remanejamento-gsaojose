@@ -2,6 +2,7 @@
 
 import {
   ClipboardList,
+  KeyRound,
   LayoutDashboard,
   PackageCheck,
   Store,
@@ -10,7 +11,9 @@ import type { ReactNode } from "react";
 
 import { AppShell, type NavItem } from "@/components/layout/app-shell";
 import { FilialProvider } from "@/components/providers/filial-provider";
-import type { Loja } from "@/lib/types";
+import { FiliaisProvider } from "@/components/providers/filiais-provider";
+import { RemanejamentosProvider } from "@/components/providers/remanejamentos-provider";
+import type { Loja, Remanejamento } from "@/lib/types";
 
 const navegacao: NavItem[] = [
   {
@@ -29,26 +32,39 @@ const navegacao: NavItem[] = [
     label: "Separação",
     icon: PackageCheck,
   },
+  {
+    href: "/conta/trocar-senha",
+    label: "Alterar senha",
+    icon: KeyRound,
+  },
 ];
 
 export function FilialShell({
   loja,
+  filiais,
+  remanejamentosIniciais,
   children,
 }: {
   loja: Loja;
+  filiais: readonly Loja[];
+  remanejamentosIniciais: Remanejamento[];
   children: ReactNode;
 }) {
   return (
-    <FilialProvider loja={loja}>
-      <AppShell
-        mode="filial"
-        contextTitle={loja.nome}
-        contextSubtitle="Filial selecionada"
-        contextIcon={Store}
-        navItems={navegacao}
-      >
-        {children}
-      </AppShell>
-    </FilialProvider>
+    <FiliaisProvider filiais={filiais}>
+      <RemanejamentosProvider remanejamentosIniciais={remanejamentosIniciais}>
+        <FilialProvider loja={loja}>
+          <AppShell
+            mode="filial"
+            contextTitle={loja.nome}
+            contextSubtitle="Filial selecionada"
+            contextIcon={Store}
+            navItems={navegacao}
+          >
+            {children}
+          </AppShell>
+        </FilialProvider>
+      </RemanejamentosProvider>
+    </FiliaisProvider>
   );
 }

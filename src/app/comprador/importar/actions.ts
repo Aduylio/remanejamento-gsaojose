@@ -2,17 +2,25 @@
 
 import { randomUUID } from "node:crypto";
 
+import { headers } from "next/headers";
+
+import { registrarAuditoria } from "@/lib/auditoria";
 import { confirmarImportacao } from "@/lib/importacao/confirmacao";
 import { analisarLinhas } from "@/lib/importacao/analisador";
 import { ErroPlanilha, lerPlanilha } from "@/lib/importacao/planilha";
-import { criarRepositorioRemanejamentosEmMemoria } from "@/lib/importacao/repositorio";
+import {
+  criarImportacaoPendente,
+  criarRepositorioImportacoesPrisma,
+  importacaoJaConfirmada,
+  marcarImportacaoConfirmada,
+} from "@/lib/db/remanejamentos";
+import { listarFiliais } from "@/lib/db/filiais";
 import type {
   PreviewImportacao,
   ResultadoConfirmacaoImportacao,
   ResultadoPreparacaoImportacao,
 } from "@/lib/importacao/tipos";
 import { sessaoCompradorAtiva } from "@/lib/auth/session";
-import { isLojaId } from "@/data/lojas";
 
 const DURACAO_PREVIA_MS = 30 * 60 * 1000;
 const MAXIMO_PREVIAS = 20;
@@ -29,9 +37,6 @@ interface EntradaPreview {
  * substituída por armazenamento durável com expiração e escopo por usuário.
  */
 const previas = new Map<string, EntradaPreview>();
-const referenciasConfirmadas = new Map<string, { confirmadoEm: string; referencia: string }>();
-
-const repositorio = criarRepositorioRemanejamentosEmMemoria();
 
 function limparPreviaExpiradas(): void {
   const agora = Date.now();
@@ -83,7 +88,16 @@ function mensagemDeErro(erro: unknown): string {
 export async function prepararImportacaoDoPedido(
   formData: FormData,
 ): Promise<ResultadoPreparacaoImportacao> {
+  const cabecalhosPrep = await headers();
   if (!(await sessaoCompradorAtiva())) {
+    await registrarAuditoria({
+      tipoEvento: "autorizacao",
+      acao: "preparar_importacao",
+      resultado: "negacao",
+      descricao: "Tentativa sem autorização para preparar importação",
+      contexto: {},
+      headers: cabecalhosPrep,
+    });
     return {
       status: "erro",
       mensagem:
@@ -91,10 +105,14 @@ export async function prepararImportacaoDoPedido(
     };
   }
 
-  const lojaOrigemId = String(formData.get("lojaOrigemId") ?? "");
+  const lojaOrigemIdInformada = String(formData.get("lojaOrigemId") ?? "");
   const arquivo = formData.get("arquivo");
+  const filiais = await listarFiliais();
+  const lojaOrigemId = filiais.find(
+    (filial) => filial.id === lojaOrigemIdInformada,
+  )?.id;
 
-  if (!isLojaId(lojaOrigemId)) {
+  if (!lojaOrigemId) {
     return {
       status: "erro",
       mensagem: "Selecione a loja física que recebeu o pedido antes de enviar o arquivo.",
@@ -128,11 +146,13 @@ export async function prepararImportacaoDoPedido(
     };
   }
 
+  let importacaoId: string | undefined;
+
   try {
     const conteudo = Buffer.from(await arquivo.arrayBuffer());
     const planilha = await lerPlanilha(arquivo.name, conteudo);
     const agora = new Date();
-    const importacaoId = randomUUID();
+    importacaoId = randomUUID();
     const referencia = criarReferencia(agora);
     const analise = analisarLinhas(planilha.linhas, {
       lojaOrigemId,
@@ -140,7 +160,10 @@ export async function prepararImportacaoDoPedido(
       importacaoId,
       referencia,
       criadoEm: agora.toISOString(),
+      filiais,
     });
+
+    await criarImportacaoPendente(analise.preview);
 
     limparPreviaExpiradas();
 
@@ -159,6 +182,23 @@ export async function prepararImportacaoDoPedido(
       };
     }
 
+    await registrarAuditoria({
+      tipoEvento: "importacao",
+      acao: "validar",
+      resultado: "sucesso",
+      descricao: "Arquivo de importação validado com prévia disponível",
+      contexto: {
+        filialId: lojaOrigemId,
+        entidadeTipo: "importacao",
+        entidadeId: importacaoId,
+        metadados: {
+          erros: analise.preview.erros.length,
+          avisos: analise.preview.avisos.length,
+        },
+      },
+      headers: cabecalhosPrep,
+    });
+
     return {
       status: "ok",
       preview: analise.preview,
@@ -166,6 +206,18 @@ export async function prepararImportacaoDoPedido(
       expiraEm: new Date(entrada.expiraEmMs).toISOString(),
     };
   } catch (erro) {
+    await registrarAuditoria({
+      tipoEvento: "importacao",
+      acao: "validar",
+      resultado: "falha",
+      descricao: "Falha ao validar arquivo de importação",
+      contexto: {
+        filialId: lojaOrigemId,
+        entidadeTipo: "importacao",
+        entidadeId: importacaoId,
+      },
+      headers: cabecalhosPrep,
+    });
     return {
       status: "erro",
       mensagem: mensagemDeErro(erro),
@@ -177,7 +229,16 @@ export async function confirmarImportacaoDoPedido(
   importacaoId: string,
   token: string,
 ): Promise<ResultadoConfirmacaoImportacao> {
+  const cabecalhos = await headers();
   if (!(await sessaoCompradorAtiva())) {
+    await registrarAuditoria({
+      tipoEvento: "autorizacao",
+      acao: "confirmar_importacao",
+      resultado: "negacao",
+      descricao: "Tentativa sem autorização para confirmar importação",
+      contexto: {},
+      headers: cabecalhos,
+    });
     return {
       status: "falha",
       mensagem:
@@ -215,9 +276,24 @@ export async function confirmarImportacaoDoPedido(
     };
   }
 
-  const jaConfirmada = referenciasConfirmadas.has(importacaoId);
+  const [jaConfirmada, filiais] = await Promise.all([
+    importacaoJaConfirmada(importacaoId),
+    listarFiliais(),
+  ]);
 
   if (jaConfirmada) {
+    await registrarAuditoria({
+      tipoEvento: "importacao",
+      acao: "confirmar",
+      resultado: "falha",
+      descricao: "Tentativa de confirmar importação já confirmada",
+      contexto: {
+        entidadeTipo: "importacao",
+        entidadeId: importacaoId,
+        filialId: entrada.preview.lojaOrigemId,
+      },
+      headers: cabecalhos,
+    });
     return {
       status: "duplicada",
       mensagem:
@@ -225,19 +301,30 @@ export async function confirmarImportacaoDoPedido(
     };
   }
 
-  const resultado = confirmarImportacao({
+  const resultado = await confirmarImportacao({
     preview: entrada.preview,
     jaConfirmada,
-    repositorio,
-    marcarConfirmada: () => {
-      referenciasConfirmadas.set(importacaoId, {
-        confirmadoEm: new Date().toISOString(),
-        referencia: entrada.preview.referencia,
-      });
+    repositorio: criarRepositorioImportacoesPrisma(importacaoId),
+    marcarConfirmada: async () => {
+      await marcarImportacaoConfirmada(importacaoId);
     },
+    filiais,
   });
 
   if (resultado.status === "confirmada") {
+    await registrarAuditoria({
+      tipoEvento: "importacao",
+      acao: "confirmar",
+      resultado: "sucesso",
+      descricao: "Importação confirmada",
+      contexto: {
+        entidadeTipo: "importacao",
+        entidadeId: importacaoId,
+        filialId: entrada.preview.lojaOrigemId,
+        metadados: { remanejamentos: resultado.remanejamentos.length },
+      },
+      headers: cabecalhos,
+    });
     return {
       status: "ok",
       referencia: resultado.referencia,
@@ -247,12 +334,48 @@ export async function confirmarImportacaoDoPedido(
   }
 
   if (resultado.status === "duplicada") {
+    await registrarAuditoria({
+      tipoEvento: "importacao",
+      acao: "confirmar",
+      resultado: "falha",
+      descricao: "Importação já confirmada",
+      contexto: {
+        entidadeTipo: "importacao",
+        entidadeId: importacaoId,
+        filialId: entrada.preview.lojaOrigemId,
+      },
+      headers: cabecalhos,
+    });
     return { status: "duplicada", mensagem: resultado.mensagem };
   }
 
   if (resultado.status === "invalida") {
+    await registrarAuditoria({
+      tipoEvento: "importacao",
+      acao: "confirmar",
+      resultado: "falha",
+      descricao: "Falha na validação ao confirmar importação",
+      contexto: {
+        entidadeTipo: "importacao",
+        entidadeId: importacaoId,
+        filialId: entrada.preview.lojaOrigemId,
+      },
+      headers: cabecalhos,
+    });
     return { status: "invalida", erros: resultado.erros };
   }
 
+  await registrarAuditoria({
+    tipoEvento: "importacao",
+    acao: "confirmar",
+    resultado: "falha",
+    descricao: "Falha ao confirmar importação",
+    contexto: {
+      entidadeTipo: "importacao",
+      entidadeId: importacaoId,
+      filialId: entrada.preview.lojaOrigemId,
+    },
+    headers: cabecalhos,
+  });
   return { status: "falha", mensagem: resultado.mensagem };
 }

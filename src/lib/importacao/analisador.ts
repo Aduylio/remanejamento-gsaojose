@@ -1,4 +1,4 @@
-import { getLoja, getLojaPorCnpj, isLojaId } from "@/data/lojas";
+import { criarCatalogoFiliais } from "@/lib/filiais";
 import { normalizarCnpj } from "@/lib/cnpj";
 import { parseCsv } from "@/lib/importacao/csv";
 import type {
@@ -372,6 +372,7 @@ export function analisarLinhas(
   const erros: OcorrenciaImportacao[] = [];
   const avisos: OcorrenciaImportacao[] = [];
   const blocos: BlocoPedido[] = [];
+  const filiais = criarCatalogoFiliais(opcoes.filiais);
   const linhasNaoVazias = linhas.filter((linha) =>
     linha.some((celula) => celula.trim() !== ""),
   );
@@ -409,7 +410,7 @@ export function analisarLinhas(
       const cnpjInformado = limparIdentificador(dados.valores.cnpj);
       const cnpjNormalizado = normalizarCnpj(cnpjInformado);
       const nomeFilialArquivo = textoLimpo(dados.valores.nomeFilial);
-      const loja = getLojaPorCnpj(cnpjNormalizado);
+      const loja = filiais.getLojaPorCnpj(cnpjNormalizado);
 
       const bloco: BlocoPedido = {
         indice: blocos.length + 1,
@@ -606,7 +607,7 @@ export function analisarLinhas(
     });
   }
 
-  const destinos = agruparDestinos(blocos, opcoes.lojaOrigemId);
+  const destinos = agruparDestinos(blocos, opcoes.lojaOrigemId, filiais);
   const itensOrigem = blocos
     .filter((bloco) => bloco.lojaId === opcoes.lojaOrigemId)
     .flatMap((bloco) => bloco.produtos.filter(produtoValido));
@@ -668,7 +669,7 @@ export function analisarLinhas(
       blocos.length > 0 &&
       produtosValidos.length > 0 &&
       destinos.length > 0 &&
-      isLojaId(opcoes.lojaOrigemId),
+      filiais.isLojaId(opcoes.lojaOrigemId),
   };
 
   return { preview, blocos };
@@ -677,6 +678,7 @@ export function analisarLinhas(
 function agruparDestinos(
   blocos: BlocoPedido[],
   lojaOrigemId: LojaId,
+  filiais: ReturnType<typeof criarCatalogoFiliais>,
 ): DestinoPreview[] {
   const porLoja = new Map<LojaId, ProdutoImportado[]>();
 
@@ -696,7 +698,7 @@ function agruparDestinos(
 
   return [...porLoja.entries()]
     .map(([lojaId, itens]) => {
-      const loja = getLoja(lojaId);
+      const loja = filiais.getLoja(lojaId);
 
       return {
         lojaId,

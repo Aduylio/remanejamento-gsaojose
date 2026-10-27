@@ -27,7 +27,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getNomeLoja } from "@/data/lojas";
+import { useFiliais } from "@/components/providers/filiais-provider";
 import { tarefasDeSeparacaoDaLoja } from "@/lib/data/remanejamentos";
 import {
   formatarDataHora,
@@ -40,6 +40,7 @@ import {
 export default function SeparacaoPage() {
   const loja = useFilial();
   const { remanejamentos } = useRemanejamentos();
+  const { getNomeLoja } = useFiliais();
 
   const tarefas = useMemo(
     () =>

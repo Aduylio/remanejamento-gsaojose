@@ -55,11 +55,11 @@ export function ImportarTrier() {
       const res = await confirmarImportacaoTrier(importacaoId);
       if (res.status === "ok") {
         try {
-          importarRemanejamentos(res.remanejamentos as any);
+          importarRemanejamentos(res.remanejamentos);
           setSucesso(true);
           setPreview(null);
         } catch {
-          setErro("Importação confirmada, mas não foi possível exibir nesta sessão.");
+          setErro("Importação confirmada, mas não foi possível atualizar a lista agora.");
           setSucesso(true);
         }
       } else if (res.status === "duplicada") {
@@ -70,7 +70,7 @@ export function ImportarTrier() {
         setErro(res.mensagem || "Falha");
       }
     } catch {
-      setErro("Erro ao confirmar.");
+      setErro("Não foi possível confirmar a importação.");
     } finally {
       setConfirmando(false);
     }

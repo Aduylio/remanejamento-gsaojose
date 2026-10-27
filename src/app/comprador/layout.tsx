@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { CompradorShell } from "@/components/layout/comprador-shell";
+import { listarFiliais } from "@/lib/db/filiais";
+import { listarRemanejamentos } from "@/lib/db/remanejamentos";
 import {
   obterFilialSelecionada,
   sessaoCompradorAtiva,
@@ -20,5 +22,17 @@ export default async function CompradorLayout({
     redirect("/login?erro=comprador");
   }
 
-  return <CompradorShell>{children}</CompradorShell>;
+  const [filiais, remanejamentos] = await Promise.all([
+    listarFiliais(),
+    listarRemanejamentos(),
+  ]);
+
+  return (
+    <CompradorShell
+      filiais={filiais}
+      remanejamentosIniciais={remanejamentos}
+    >
+      {children}
+    </CompradorShell>
+  );
 }

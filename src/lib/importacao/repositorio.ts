@@ -13,9 +13,8 @@ interface OpcoesRepositorioEmMemoria {
 }
 
 /**
- * Repositório transitório usado pela demonstração. Ele existe para garantir
- * o contrato atômico e a proteção contra dupla confirmação no servidor.
- * Não substitui uma persistência real.
+ * Repositório em memória usado exclusivamente nos testes unitários para
+ * validar o contrato atômico do caso de uso.
  */
 export function criarRepositorioRemanejamentosEmMemoria(
   opcoes: OpcoesRepositorioEmMemoria = {},
@@ -29,7 +28,7 @@ export function criarRepositorioRemanejamentosEmMemoria(
       }
 
       if (remanejamentos.length === 0) {
-        return;
+        return [];
       }
 
       const candidato = new Map(registros);
@@ -45,6 +44,8 @@ export function criarRepositorioRemanejamentosEmMemoria(
       }
 
       registros = candidato;
+
+      return remanejamentos;
     },
     listar() {
       return [...registros.values()];
